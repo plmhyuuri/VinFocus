@@ -21,13 +21,13 @@ No installation or setup is required, just open the link, follow the setup wizar
 ![alt text](static/images/landing.png)
 
 ### Setup Wizard
-![alt text](static/images/image-3.png)
+![alt text](static/images/setup-wizard.png)
 
 ### Work View
-![alt text](static/images/image-5.png)
+![alt text](static/images/work-view.png)
 
 ### Timetable
-![alt text](static/images/image-2.png)
+![alt text](static/images/timetable.png)
 
 ## Why I Built This
 

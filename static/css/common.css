@@ -21,3 +21,15 @@ button {
 * {
     font-family: "JetBrainsMono Nerd Font" !important;
 }
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  scrollbar-width: none;
+}
+
+body {
+  -ms-overflow-style: none;
+}

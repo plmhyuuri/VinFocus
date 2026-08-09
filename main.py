@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-VINFOCUS_SCRIPT_VERSION = "1.7.4"
+VINFOCUS_SCRIPT_VERSION = "1.8.0"
 
 # Configure logging
 logging.basicConfig(
