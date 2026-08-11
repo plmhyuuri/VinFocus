@@ -264,6 +264,10 @@ def static_files(filename):
     response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return response
 
+@app.route("/sitemap.xml")
+def sitemap():
+    return app.send_static_file("sitemap.xml")
+
 
 def no_store_response(response):
     response = make_response(response)
