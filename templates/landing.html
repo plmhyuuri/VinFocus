@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="VinFocus - Browse Canvas. Not the clutter. A personal information hub for Vinschool's Canvas LMS.">
+    <meta name="description" content="A cleaner dashboard for Vinschool's Canvas LMS. Browse assignments, courses, and schedules faster with VinFocus.">
     <meta name="theme-color" content="#ffffff">
     <link rel="icon" type="image/png" href="/static/images/favicon-96x96.png?v=1" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg?v=1" />
@@ -11,11 +11,15 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/static/images/apple-touch-icon.png?v=1" />
     <meta name="apple-mobile-web-app-title" content="VinFocus" />
     <link rel="manifest" href="/static/images/site.webmanifest?v=1" />
+    <link rel="canonical" href="https://vinfocus.study">
 
     <meta property="og:title" content="VinFocus">
     <meta property="og:description" content="Browse Canvas. Not the clutter.">
     <meta property="og:image" content="https://vinfocus.onrender.com/static/images/work-view.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
     <meta property="og:url" content="https://vinfocus.onrender.com">
+    <meta property="og:site_name" content="VinFocus">
     <meta property="og:type" content="website">
 
     <meta name="twitter:card" content="summary_large_image">
@@ -23,9 +27,13 @@
     <meta name="twitter:description" content="Browse Canvas. Not the clutter.">
     <meta name="twitter:image" content="https://vinfocus.onrender.com/static/images/work-view.png">
 
-    <title>VinFocus — Browse Canvas. Not the clutter.</title>
+    <title>VinFocus - Canvas Dashboard for Vinschool Students</title>
+    <link rel="preload" as="image" href="/static/images/timetable.png" fetchpriority="high">
+    <link rel="preload" as="image" href="/static/images/setup-wizard.png" fetchpriority="high">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}">
+
+    <meta name="google-site-verification" content="dBQVmcWY2xCMsUlw5XvUOVy44liwquZFDuc0F8vvAXw" />
 </head>
 <body>
 
@@ -69,7 +77,7 @@
         <p class="eyebrow hero_eyebrow" id="hero_prompt" aria-hidden="false">
             <span class="eyebrow_prompt">$</span><span id="hero_prompt_text" data-i18n="hero_eyebrow">vinfocus --view this-week</span><span class="hero_caret" aria-hidden="true"></span>
         </p>
-        <h1 class="hero_title" data-i18n="hero_title">Browse Canvas.<br>Not the clutter.</h1>
+        <h1 class="hero_title" data-i18n="hero_title">VinFocus: Canvas Dashboard for Vinschool students</h1>
         <p class="hero_desc" data-i18n="hero_desc">
             A faster way through Vinschool's Canvas LMS. Everything from Canvas, nothing in your way.
         </p>
@@ -122,17 +130,17 @@
                 <div class="dash_track" id="dash_track">
 
                     <div class="dash_slide">
-                        <img src="/static/images/work-view.png" alt="Work view with week navigation, course pills, and item list organized by type with completion badges" class="dash_image" loading="lazy">
+                        <img src="/static/images/work-view.png" alt="Work view with week navigation, course pills, and item list organized by type with completion badges" class="dash_image" loading="eager" width="800" height="450">
                         <p class="dash_caption mono" data-i18n="dash_work">Find assignments by week without digging through modules.</p>
                     </div>
 
                     <div class="dash_slide">
-                        <img src="/static/images/timetable.png" alt="Weekly timetable grid showing Monday-to-Friday columns with subject periods, current period highlighting, and today column emphasis" class="dash_image" loading="lazy">
+                        <img src="/static/images/timetable.png" alt="Weekly timetable grid showing Monday-to-Friday columns with subject periods, current period highlighting, and today column emphasis" class="dash_image" loading="eager" width="800" height="450">
                         <p class="dash_caption mono" data-i18n="dash_timetable">See what class comes next at a glance.</p>
                     </div>
 
                     <div class="dash_slide">
-                        <img src="/static/images/setup-wizard.png" alt="Setup wizard for generating and pasting a Canvas API access token" class="dash_image" loading="lazy">
+                        <img src="/static/images/setup-wizard.png" alt="Setup wizard for generating and pasting a Canvas API access token" class="dash_image" loading="eager" width="800" height="450">
                         <p class="dash_caption mono" data-i18n="dash_setup">Go from Access Card to your week in minutes.</p>
                     </div>
 

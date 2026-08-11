@@ -745,19 +745,25 @@ a {
     gap: 20px;
     width: max-content;
     animation: dashScroll linear infinite;
+    will-change: transform;
+    animation-play-state: paused;
+}
+
+.dash_track.dash_ready {
+    animation-play-state: running;
 }
 
 .dash_slide {
-    width: 540px;
-    flex: 0 0 540px;
+    width: 800px;
+    flex: 0 0 800px;
 }
 
 .dash_image {
     display: block;
-    width: min(590px, calc(50vw - 10px));
-    height: auto;
+    width: 100%;
+    aspect-ratio: 16 / 9;
     background: var(--app-bg);
-    border: 1px solid rgba(148, 170, 200, 0.16);
+    border: 1px solid rgba(0,0,0,0.08);
     border-radius: 14px;
 }
 
@@ -856,6 +862,8 @@ a {
     display: flex;
     flex-direction: column;
     text-align: left;
+    margin: 48px auto 0;
+    max-width: 760px;
 }
 
 .faq_item {
@@ -913,7 +921,6 @@ a {
     font-size: 0.9375rem;
     color: var(--ink-2);
     line-height: 1.7;
-    max-width: 60ch;
 }
 
 /* ── CTA ── */

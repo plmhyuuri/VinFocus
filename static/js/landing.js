@@ -128,26 +128,29 @@
   /* ── Dashboard carousel (CSS keyframe infinite loop) ── */
   var dashViewport = document.getElementById("dash_viewport");
   var dashTrack = document.getElementById("dash_track");
+  var originalSlides = null;
 
   function buildDashLoop() {
     if (!dashTrack) return;
-    var slides = Array.from(dashTrack.children);
-    if (slides.length === 0) return;
 
-    // duplicate the set 4 times for seamless looping (3 originals + 11 clones = 12 total)
+    if (!originalSlides) {
+      originalSlides = Array.from(dashTrack.children);
+    }
+    if (originalSlides.length === 0) return;
+
     dashTrack.innerHTML = "";
     var frag = document.createDocumentFragment();
     for (var r = 0; r < 4; r++) {
-      slides.forEach(function (s) {
+      originalSlides.forEach(function (s) {
         frag.appendChild(s.cloneNode(true));
       });
     }
     dashTrack.appendChild(frag);
 
-    // measure one original set width and feed it to the CSS animation
-    requestAnimationFrame(function () {
+    function measure() {
+      if (!dashTrack || dashTrack.children.length <= originalSlides.length) return;
       var distance =
-        dashTrack.children[slides.length].offsetLeft -
+        dashTrack.children[originalSlides.length].offsetLeft -
         dashTrack.children[0].offsetLeft;
 
       dashTrack.style.setProperty(
@@ -157,17 +160,78 @@
 
       dashTrack.style.animationDuration =
         (distance / 60) + "s";
+    }
+
+    requestAnimationFrame(measure);
+
+    // Re-measure once every image has decoded so the loop seam is
+    // based on final rendered widths, not an early frame measurement.
+    var images = dashTrack.querySelectorAll("img");
+    var loadedCount = 0;
+    function onReady() {
+      loadedCount++;
+      if (loadedCount >= images.length) {
+        requestAnimationFrame(measure);
+      }
+    }
+    images.forEach(function (img) {
+      if (img.complete) {
+        onReady();
+      } else {
+        img.addEventListener("load", onReady, { once: true });
+        img.addEventListener("error", onReady, { once: true });
+      }
     });
+  }
+
+  var resizeTimer = null;
+  function onDashResize() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      if (dashViewport && dashTrack) {
+        buildDashLoop();
+      }
+    }, 200);
   }
 
   if (dashViewport && dashTrack) {
     buildDashLoop();
+    window.addEventListener("resize", onDashResize, { passive: true });
+  }
+
+  /* Resume the carousel only after every image has decoded so the
+     first animation frames don't fight main-thread decode work. */
+  if (!reduceMotion && dashViewport && dashTrack) {
+    var readyCount = 0;
+    var totalImages = dashTrack.querySelectorAll("img").length;
+    if (totalImages > 0) {
+      function tryResume() {
+        readyCount++;
+        if (readyCount >= totalImages) {
+          requestAnimationFrame(function () {
+            dashTrack.classList.add("dash_ready");
+          });
+        }
+      }
+      Array.from(dashTrack.querySelectorAll("img")).forEach(function (img) {
+        if (img.complete) {
+          tryResume();
+        } else {
+          img.addEventListener("load", tryResume, { once: true });
+          img.addEventListener("error", tryResume, { once: true });
+        }
+      });
+    } else {
+      dashTrack.classList.add("dash_ready");
+    }
+  } else if (reduceMotion && dashTrack) {
+    dashTrack.classList.add("dash_ready");
   }
 
   /* ── Scroll-triggered reveal ── */
   var revealTargets = document.querySelectorAll(
     ".section .eyebrow, .section .section_title, .section .section_desc, " +
-    ".window, .perm_table, .privacy_note, .faq_item, .dash_slide"
+    ".window, .perm_table, .privacy_note, .faq_item"
   );
 
   if (!reduceMotion) {
