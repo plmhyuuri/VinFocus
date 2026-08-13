@@ -782,9 +782,35 @@ let courseProgress = new Map(); // course_id -> { done, total }
 // Load persisted course progress so bars survive refresh
 loadCourseProgress();
 
+// Vietnamese full subject names (grade 10 course_code/name format, e.g.
+// "HANGVM5-CÔNG DÂN TOÀN CẦU-10-2026 - 2027") map to canonical subject keys
+// so SUBJECT_LABELS resolves them. Extend this map as more grade-10 courses
+// are encountered.
+const SUBJECT_NAME_TO_KEY = {
+  "CÔNG DÂN TOÀN CẦU": "GCED",
+};
+
 function courseSubjectKey(course) {
   const parts = (course.course_code || "").split("-");
-  return parts[0] === "THCS.OP" && parts.length >= 3 ? parts[1] : null;
+  if (parts.length < 2) {
+    return null;
+  }
+  const raw = parts[1].trim();
+  // Map Vietnamese full subject names to canonical English keys. For the
+  // THCS.OP middle-school format (e.g. "THCS.OP-MATHS-TEACHER") the raw token
+  // is already a known key, so it passes through unchanged.
+  return SUBJECT_NAME_TO_KEY[raw] || raw || null;
+}
+
+// Fallback subject resolution when a course_code does not yield a subject key.
+// Tries to map a Vietnamese subject name found in the course name to its key.
+function resolveNameSubject(course) {
+  const token = (course.name || "").split("-")[1]?.trim();
+  if (!token) {
+    return null;
+  }
+  const key = SUBJECT_NAME_TO_KEY[token] || token;
+  return getSubjectLabel(key) || null;
 }
 
 function courseTeacherCode(course) {
@@ -806,7 +832,7 @@ function courseShortLabel(course) {
   const subjectKey = courseSubjectKey(course);
   const subject = subjectKey
     ? getSubjectLabel(subjectKey)
-    : (course.name || "").split("-")[1]?.trim().slice(0, 14) || `Course ${course.id}`;
+    : resolveNameSubject(course) || `Course ${course.id}`;
 
   if ((subjectCounts.get(subjectKey) || 0) > 1) {
     const teacher = courseTeacherCode(course);

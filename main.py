@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-VINFOCUS_SCRIPT_VERSION = "1.8.0"
+VINFOCUS_SCRIPT_VERSION = "1.8.2"
 
 # Configure logging
 logging.basicConfig(
@@ -1200,7 +1200,7 @@ def init_db_pool() -> None:
     if not DATABASE_URL:
         logger.warning("DATABASE_URL not set - feedback features will be disabled")
         return
-    
+
     try:
         _db_pool = SimpleConnectionPool(
             minconn=2,     # Increased from 1 for redundancy
