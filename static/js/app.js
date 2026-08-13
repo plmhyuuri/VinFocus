@@ -212,6 +212,7 @@ const TRANSLATIONS = {
     work: "Work",
     timetable: "Timetable",
     about: "About",
+    resource: "Resources",
     aboutTitle: "About VinFocus",
     aboutWhatTitle: "What is VinFocus?",
     aboutWhatDesc: "VinFocus is a personal dashboard for Vinschool's Canvas LMS. It organizes quizzes, assignments, files, and course modules into a cleaner, easier-to-navigate interface so students can quickly find what they need.",
@@ -235,6 +236,18 @@ const TRANSLATIONS = {
     aboutThanks: "Thanks for using VinFocus.",
     aboutTetoCaption: "almost any website will eventually have a mysterious mascot.\nthis one's ours.",
     aboutBlessing: "$ vinfocus --good-luck\n\ngood luck this semester.\n\nhope this little project saves you\na few clicks every day.\n\n(>ω<)ﾉ - fatass teto",
+    resourceTitle: "Community Resources",
+    resourceSubtitle: "Study guides, notes, and useful links contributed by students.",
+    resourceDocsTitle: "Notes Library",
+    resourceDocsDesc: "Notes, summaries, and links shared by students across subjects.",
+    ebook_library: "E-Book Library",
+    ebook_library_desc: "Textbooks and reference books organized by subject.",
+    literature: "Literature",
+    geography: "Geography",
+    history: "History",
+    open_ebook_library: "Open E-Book Library",
+    ebook_modal_title: "E-Book Library",
+    ebook_modal_close: "Close",
     offlineBanner: "Offline — showing cached data.",
     week: "Week",
     general: "Unassigned Modules",
@@ -440,6 +453,7 @@ const TRANSLATIONS = {
     work: "Làm Việc",
     timetable: "Thời Khóa Biểu",
     about: "Giới Thiệu",
+    resource: "Tài Nguyên",
     aboutTitle: "Giới Thiệu VinFocus",
     aboutWhatTitle: "VinFocus là gì?",
     aboutWhatDesc: "VinFocus là một bảng điều khiển cá nhân cho Canvas LMS của vinschool. Nó sắp xếp các bài kiểm tra, bài tập, tệp tin và các module khóa học vào một giao diện sạch hơn, dễ điều hướng hơn, giúp học sinh nhanh chóng tìm thấy những gì cần thiết.",
@@ -463,6 +477,18 @@ const TRANSLATIONS = {
     aboutThanks: "Cảm ơn bạn đã sử dụng VinFocus.",
     aboutTetoCaption: "bạn đã cuộn đến cuối trang. tuy nhiên, con Teto này đã ở đây từ trước, dù hình dạng của nó trông như vừa thua một trận với định luật vật lý.",
     aboutBlessing: "$ vinfocus --good-luck\n\nchúc bạn may mắn trong học kỳ này.\n\nhy vọng dự án nhỏ này giúp bạn\ntiết kiệm vài cú click mỗi ngày.\n\n(>ω<)ﾉ - fatass teto",
+    resourceTitle: "Tài Nguyên Cộng Đồng",
+    resourceSubtitle: "Hướng dẫn học, ghi chú và các liên kết hữu ích được đóng góp bởi học sinh.",
+    resourceDocsTitle: "Thư viện ghi chú",
+    resourceDocsDesc: "Ghi chú, tóm tắt và liên kết được chia sẻ bởi học sinh các khối lớp.",
+    ebook_library: "Thư Viện Sách Điện Tử",
+    ebook_library_desc: "Sách giáo khoa và tài liệu học tập được sắp xếp theo môn học.",
+    literature: "Ngữ Văn",
+    geography: "Địa Lí",
+    history: "Lịch Sử",
+    open_ebook_library: "Mở Thư Viện Sách Điện Tử",
+    ebook_modal_title: "Thư Viện Sách Điện Tử",
+    ebook_modal_close: "Đóng",
     offlineBanner: "Ngoại tuyến — đang hiển thị dữ liệu đã lưu.",
     week: "Tuần",
     general: "Học phần chưa phân tuần",
@@ -683,6 +709,165 @@ const DEFAULT_TIMETABLE = {
   ],
 };
 
+// ── E-Book Library Resource Card ───────────────────────────────
+// Official NXBGD Grade 10 digital textbooks, keyed by translation key.
+// Add new subjects to this array — the desktop hover grid and the mobile
+// modal both render automatically and wrap via CSS Grid.
+const EBOOK_SUBJECTS = [
+  { key: "literature", icon: "📖", url: "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-ngu-van-10-tap-mot.4700658723#page=0" },
+  { key: "geography", icon: "🌍", url: "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-dia-li-10.4700970617#page=0" },
+  { key: "history", icon: "📜", url: "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-lich-su-10.4755748913#page=0" },
+];
+
+let ebookHoverDisabled = false;
+
+// True on touch-first hardware where :hover is not meaningful.
+function isEbookHoverDisabled() {
+  if (typeof window === "undefined" || !window.matchMedia) return true;
+  // A touch-first device either can't hover, has a coarse pointer, or exposes
+  // touch points. Any of these should switch the card to tap→modal behaviour.
+  const hoverNone = window.matchMedia("(hover: none)").matches;
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const touchPoints = typeof navigator !== "undefined" && !!navigator.maxTouchPoints
+    ? navigator.maxTouchPoints > 0
+    : false;
+  return hoverNone || coarse || touchPoints;
+}
+
+// Build a fresh, localized subject link element.
+function createEbookSubjectLink(subject) {
+  const label = t(subject.key);
+  const link = document.createElement("a");
+  link.className = "ebook_subject_link";
+  link.href = subject.url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.setAttribute("aria-label", `${label} — ${t("open_ebook_library")}`);
+  link.textContent = `${subject.icon} ${label}`;
+  return link;
+}
+
+// (Re)renders the title/description, the desktop hover-grid links, the open
+// modal's list (if present), and (re)applies the card's role/cursor for the
+// current input modality. Called on first paint and after every language switch.
+function renderEbookLibrary() {
+  ebookHoverDisabled = isEbookHoverDisabled();
+
+  const title = document.getElementById("ebook_library_title");
+  const desc = document.getElementById("ebook_library_desc");
+  if (title) title.textContent = t("ebook_library");
+  if (desc) desc.textContent = t("ebook_library_desc");
+
+  // Desktop hover grid (rebuilt so labels follow language changes)
+  const hoverGrid = document.getElementById("ebook_subject_grid");
+  if (hoverGrid) {
+    hoverGrid.replaceChildren();
+    EBOOK_SUBJECTS.forEach((s) => hoverGrid.appendChild(createEbookSubjectLink(s)));
+  }
+
+  // Mobile modal list (only re-rendered while the modal is open)
+  const modalList = document.getElementById("ebook_modal_list");
+  if (modalList) {
+    modalList.replaceChildren();
+    EBOOK_SUBJECTS.forEach((s) => modalList.appendChild(createEbookSubjectLink(s)));
+  }
+
+  // Keep card semantics in sync with the input modality.
+  const card = document.getElementById("ebook_card");
+  if (card) {
+    const modalOpen = document.getElementById("ebook_modal") !== null;
+    if (ebookHoverDisabled) {
+      card.setAttribute("role", "button");
+      card.setAttribute("tabindex", "0");
+      card.setAttribute("aria-haspopup", "dialog");
+      card.setAttribute("aria-expanded", String(modalOpen));
+      card.setAttribute("aria-label", t("open_ebook_library"));
+      card.style.cursor = "pointer";
+    } else {
+      card.removeAttribute("role");
+      card.removeAttribute("tabindex");
+      card.removeAttribute("aria-haspopup");
+      card.setAttribute("aria-label", t("ebook_library"));
+      card.style.cursor = "";
+    }
+  }
+}
+
+// Opens the tap-to-open modal (mobile/touch only).
+function openEbookModal() {
+  if (!ebookHoverDisabled) return;
+  if (document.getElementById("ebook_modal")) return;
+
+  const modal = document.createElement("div");
+  modal.id = "ebook_modal";
+  modal.className = "token_settings_modal ebook_modal";
+  prepareModal(modal);
+
+  const content = document.createElement("div");
+  content.className = "token_settings_content ebook_modal_content";
+
+  const title = document.createElement("h2");
+  title.textContent = t("ebook_library");
+  title.style.marginTop = "0";
+  content.appendChild(title);
+
+  const list = document.createElement("div");
+  list.id = "ebook_modal_list";
+  list.className = "ebook_modal_list";
+  content.appendChild(list);
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "setup_validate_btn";
+  closeBtn.style.width = "100%";
+  closeBtn.textContent = t("ebook_modal_close");
+  closeBtn.addEventListener("click", () => closeEbookModal(modal));
+  content.appendChild(closeBtn);
+
+  // Top-right X close (reuses existing shared helper + styling).
+  addModalCloseButton(content, () => closeEbookModal(modal));
+
+  modal.appendChild(content);
+
+  // Backdrop click closes the modal.
+  modal.setAttribute("data-backdrop-listener", "true");
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeEbookModal(modal);
+  });
+
+  document.body.appendChild(modal);
+  renderEbookLibrary(); // refresh labels + aria-expanded
+
+  setTimeout(() => closeBtn.focus(), 0);
+}
+
+function closeEbookModal(modal) {
+  removeModal(modal);
+  renderEbookLibrary();
+}
+
+// Wire the card as a tap target on touch devices. Runs once on init.
+function initEbookCard() {
+  const card = document.getElementById("ebook_card");
+  if (!card) return;
+
+  card.addEventListener("click", (e) => {
+    // On desktop the card is a no-op; only subject links navigate.
+    if (!ebookHoverDisabled) return;
+    if (e.target.closest(".ebook_subject_link")) return;
+    e.preventDefault();
+    openEbookModal();
+  });
+
+  card.addEventListener("keydown", (e) => {
+    if (!ebookHoverDisabled) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openEbookModal();
+    }
+  });
+}
+
 function loadTimetable() {
   try {
     const stored = storageGet("timetable");
@@ -788,6 +973,20 @@ loadCourseProgress();
 // are encountered.
 const SUBJECT_NAME_TO_KEY = {
   "CÔNG DÂN TOÀN CẦU": "GCED",
+  "VẬT LÝ" : "PHY",
+  "LỊCH SỬ" : "HIS",
+  "ĐỊA LÝ" : "GEO",
+  "GIÁO DỤC THỂ CHẤT" : "PE",
+  "NGỮ VĂN" : "NV",
+  "CÔNG NGHỆ THÔNG TIN" : "IT",
+  "VIỆT NAM HỌC" : "VNS",
+  "GIÁO DỤC KỸ NĂNG PHẨM CHẤT" : "CLISE",
+  "TOÁN" : "MATHS",
+  "ÂM NHẠC" : "MUS",
+  "SINH HỌC" : "BIO",
+  "HÓA HỌC" : "CHEM",
+  "MĨ THUẬT" : "ART",
+  "ENGLISH (LOCAL TEACHERS)" : "ESL (GVVN)"
 };
 
 function courseSubjectKey(course) {
@@ -2301,7 +2500,7 @@ function renderTimetable() {
   const todayKey = todayDayKey();
   const currentPeriod = currentPeriodKey();
   const nextPeriod = nextPeriodKey();
-  const stateKey = `${todayKey}|${currentPeriod}|${nextPeriod}`;
+  const stateKey = `${todayKey}|${currentPeriod}|${nextPeriod}|${currentLanguage}`;
 
   // Skip re-render if nothing changed (avoids flicker on the 15s tick)
   if (_lastIndicatorState === stateKey) return;
@@ -2941,6 +3140,19 @@ function renderAll() {
   if (aboutTetoCaption) aboutTetoCaption.textContent = t("aboutTetoCaption");
   const aboutBlessing = document.getElementById("about_blessing");
   if (aboutBlessing) aboutBlessing.textContent = t("aboutBlessing");
+  // Update resource tab text
+  const resourceTab = document.querySelector(".view_tab[data-view='resource']");
+  if (resourceTab) resourceTab.textContent = t("resource");
+  // Update resource page content
+  const resourceTitle = document.getElementById("resource_title");
+  if (resourceTitle) resourceTitle.textContent = t("resourceTitle");
+  const resourceSubtitle = document.getElementById("resource_subtitle");
+  if (resourceSubtitle) resourceSubtitle.textContent = t("resourceSubtitle");
+  const resourceDocsTitle = document.getElementById("resource_docs_title");
+  if (resourceDocsTitle) resourceDocsTitle.textContent = t("resourceDocsTitle");
+  const resourceDocsDesc = document.getElementById("resource_docs_desc");
+  if (resourceDocsDesc) resourceDocsDesc.textContent = t("resourceDocsDesc");
+  renderEbookLibrary();
   // Update footer text
   const footerMadeBy = document.getElementById("footer_made_by");
   if (footerMadeBy) footerMadeBy.textContent = t("footerMadeBy");
@@ -4301,10 +4513,14 @@ document.addEventListener("DOMContentLoaded", () => {
     settingsBtn.addEventListener("click", openSettingsMenu);
   }
 
-  // Subject label edit button
+    // Subject label edit button
   if (subjectLabelEditBtn) {
     subjectLabelEditBtn.addEventListener("click", toggleSubjectLabelEditMode);
   }
+
+  // E-Book Library card (mobile tap → modal). init re-derives the input
+  // modality from renderEbookLibrary(), which has already run via renderAll().
+  initEbookCard();
 
   // Token expiry warning
   updateTokenWarning();
