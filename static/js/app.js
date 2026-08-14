@@ -257,6 +257,9 @@ const TRANSLATIONS = {
     tagline: "Canvas information hub — browse courses, weeks, and resources.",
     timetableTitle: "Weekly Timetable",
     timetableNote: "Manual schedule stored locally in this app.",
+    openTimetable: "Open timetable",
+    room: "Room",
+    roomPlaceholder: "Room (e.g. B3-201)",
     items: "items",
     noClassesAdded: "No classes added yet.",
     weekendNoClasses: "No classes, it's the weekend.",
@@ -498,6 +501,9 @@ const TRANSLATIONS = {
     tagline: "Trung tâm thông tin Canvas — duyệt khóa học, tuần và tài nguyên.",
     timetableTitle: "Thời Khóa Biểu Tuần",
     timetableNote: "Lịch học được lưu cục bộ trong ứng dụng này.",
+    openTimetable: "Mở thời khóa biểu",
+    room: "Phòng",
+    roomPlaceholder: "Phòng (vd. B3-201)",
     items: "bài",
     noClassesAdded: "Chưa có lớp học nào được thêm.",
     weekendNoClasses: "Không có tiết học nào, hôm nay là cuối tuần.",
@@ -1407,6 +1413,7 @@ function createItemRow(item, isLastInType) {
     badge.className = "status_badge status_unknown";
     badge.textContent = "?";
     badge.title = t("unknown");
+    badge.setAttribute("aria-label", t("unknown"));
   } else {
     badge.className = "status_badge status_open";
     badge.textContent = t("unfinished");
@@ -1419,6 +1426,7 @@ function createItemRow(item, isLastInType) {
     toggleBtn.className = "manual_done_btn";
     toggleBtn.textContent = "✓";
     toggleBtn.title = "Mark as done";
+    toggleBtn.setAttribute("aria-label", "Mark as done");
     toggleBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       const key = `${item.course_id}:${item.module_item_id}`;
@@ -1433,6 +1441,7 @@ function createItemRow(item, isLastInType) {
       undoBtn.className = "manual_done_btn manual_done_btn_undo";
       undoBtn.textContent = "↩";
       undoBtn.title = "Undo manual completion";
+      undoBtn.setAttribute("aria-label", "Undo manual completion");
       undoBtn.addEventListener("click", (ue) => {
         ue.stopPropagation();
         saveManualCompletion(key, false);
@@ -1443,6 +1452,7 @@ function createItemRow(item, isLastInType) {
           restoredBadge.className = "status_badge status_unknown";
           restoredBadge.textContent = "?";
           restoredBadge.title = t("unknown");
+          restoredBadge.setAttribute("aria-label", t("unknown"));
         } else {
           restoredBadge.className = "status_badge status_open";
           restoredBadge.textContent = t("unfinished");
@@ -1469,6 +1479,7 @@ function createItemRow(item, isLastInType) {
     undoBtn.className = "manual_done_btn manual_done_btn_undo";
     undoBtn.textContent = "↩";
     undoBtn.title = "Undo manual completion";
+    undoBtn.setAttribute("aria-label", "Undo manual completion");
     undoBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       const key = `${item.course_id}:${item.module_item_id}`;
@@ -1480,6 +1491,7 @@ function createItemRow(item, isLastInType) {
         newBadge.className = "status_badge status_unknown";
         newBadge.textContent = "?";
         newBadge.title = t("unknown");
+        newBadge.setAttribute("aria-label", t("unknown"));
       } else {
         newBadge.className = "status_badge status_open";
         newBadge.textContent = t("unfinished");
@@ -1490,6 +1502,7 @@ function createItemRow(item, isLastInType) {
       toggleBtn.className = "manual_done_btn";
       toggleBtn.textContent = "✓";
       toggleBtn.title = "Mark as done";
+      toggleBtn.setAttribute("aria-label", "Mark as done");
       toggleBtn.addEventListener("click", (te) => {
         te.stopPropagation();
         const k = `${item.course_id}:${item.module_item_id}`;
@@ -1503,6 +1516,7 @@ function createItemRow(item, isLastInType) {
         newUndoBtn.className = "manual_done_btn manual_done_btn_undo";
         newUndoBtn.textContent = "↩";
         newUndoBtn.title = "Undo manual completion";
+        newUndoBtn.setAttribute("aria-label", "Undo manual completion");
         newUndoBtn.addEventListener("click", (ue2) => {
           ue2.stopPropagation();
           saveManualCompletion(k, false);
@@ -1602,6 +1616,7 @@ function renderCoursePills() {
       
       button.textContent = courseShortLabel(course);
       button.title = course.name || course.course_code || "";
+      button.setAttribute("aria-label", button.title);
       button.setAttribute("aria-pressed", String(course.id === selectedCourseId));
 
       if (course.id === selectedCourseId) {
@@ -1634,6 +1649,7 @@ function renderCoursePills() {
         bar.className = "course_progress_bar";
         bar.innerHTML = `<div class="course_progress_fill" style="width:${pct}%"></div>`;
         bar.title = `${prog.done}/${prog.total} (${pct}%)`;
+        bar.setAttribute("aria-label", `${prog.done}/${prog.total} (${pct}%)`);
         wrapper.appendChild(bar);
       }
       
@@ -1775,14 +1791,15 @@ function openSubjectLabelEditor(subjectKey, pillElement) {
 
 function positionPopoverBelow(popover, anchorElement) {
   const rect = anchorElement.getBoundingClientRect();
-  
-  // Position below the anchor element
-  let top = rect.bottom + window.scrollY + 8;
-  let left = rect.left + window.scrollX;
-  
+
+  // The popover is position: fixed, so getBoundingClientRect() is already
+  // viewport-relative — adding scroll offsets would double-count on scroll.
+  let top = rect.bottom + 8;
+  let left = rect.left;
+
   // Get popover width for boundary check (use estimated width since popover isn't rendered yet)
-  const estimatedWidth = 280;
-  
+  const estimatedWidth = Math.min(280, Math.round(rect.width || 0) + 40);
+
   // Ensure popover doesn't go off-screen on the right
   const maxLeft = window.innerWidth - estimatedWidth - 16;
   if (left > maxLeft) {
@@ -2347,10 +2364,14 @@ function renderTimetableGrid() {
       if (timetableEditMode && period.type === "class") {
         slot.style.cursor = "pointer";
         slot.title = "Click to edit subject";
+        slot.setAttribute("aria-label", "Click to edit subject");
         slot.dataset.dayKey = day.key;
         slot.dataset.periodKey = period.key;
+        slot.tabIndex = 0;
+        slot.setAttribute("role", "button");
         // Use a single event listener on the parent instead of per-slot listeners
         slot.addEventListener("click", handleSlotClick);
+        slot.addEventListener("keydown", handleSlotKeydown);
       }
 
       slot.append(createSlotContent(period, entry));
@@ -2427,10 +2448,12 @@ function renderTimetableMobile() {
 
     const hasClasses = (TIMETABLE[day.key] || []).some((entry) => entry.subject);
     if (!hasClasses) {
+      // Fully free day: show only the empty message, no break/lunch slots.
       const empty = document.createElement("p");
       empty.className = "day_empty";
       empty.textContent = t("noClassesAdded");
       section.appendChild(empty);
+      return section;
     }
 
     for (const period of TIMETABLE_PERIODS) {
@@ -2458,8 +2481,12 @@ function renderTimetableMobile() {
         slot.style.cursor = "pointer";
         slot.dataset.dayKey = day.key;
         slot.dataset.periodKey = period.key;
+        slot.tabIndex = 0;
+        slot.setAttribute("role", "button");
+        slot.setAttribute("aria-label", "Click to edit subject");
         // Use single event handler
         slot.addEventListener("click", handleSlotClick);
+        slot.addEventListener("keydown", handleSlotKeydown);
       }
 
       slot.append(time, content);
@@ -2474,6 +2501,7 @@ function renderTimetableMobile() {
 
 let _lastIndicatorState = null;
 let _lastTimetableTick = 0;
+let _lastTimetableInteraction = 0;
 
 function isWithinSchoolHours() {
   const now = new Date();
@@ -2489,26 +2517,30 @@ function isWithinSchoolHours() {
 function timetableClockLoop(timestamp) {
   if (timestamp - _lastTimetableTick >= 15000) {
     _lastTimetableTick = timestamp;
-    if (isWithinSchoolHours()) {
+    // Skip the auto refresh while the user is actively scrolling/interacting
+    // with the mobile timetable so their scroll position isn't reset.
+    if (isWithinSchoolHours() && Date.now() - _lastTimetableInteraction > 2000) {
       renderTimetable();
     }
   }
   requestAnimationFrame(timetableClockLoop);
 }
 
-function renderTimetable() {
+function renderTimetable(force) {
   const todayKey = todayDayKey();
   const currentPeriod = currentPeriodKey();
   const nextPeriod = nextPeriodKey();
-  const stateKey = `${todayKey}|${currentPeriod}|${nextPeriod}|${currentLanguage}`;
+  const stateKey = `${todayKey}|${currentPeriod}|${nextPeriod}|${currentLanguage}|${timetableEditMode}`;
 
-  // Skip re-render if nothing changed (avoids flicker on the 15s tick)
-  if (_lastIndicatorState === stateKey) return;
+  // Skip re-render if nothing changed (avoids flicker on the 15s tick),
+  // unless a render was explicitly forced (e.g. after an edit/save).
+  if (!force && _lastIndicatorState === stateKey) return;
   _lastIndicatorState = stateKey;
 
   renderTimetableIndicators();
   renderTimetableGrid();
   renderTimetableMobile();
+  updateTimetableViewToggleButtons();
 }
 
 function isMobile() {
@@ -2518,16 +2550,17 @@ function isMobile() {
 function openSubjectEditor(dayKey, periodKey, slotElement) {
   const currentEntry = timetableEntryFor(dayKey, periodKey);
   const currentSubject = currentEntry?.subject || "";
+  const currentRoom = currentEntry?.room || "";
   
   // Use modal editor on mobile, inline editor on desktop
   if (isMobile()) {
-    openMobileSubjectEditor(dayKey, periodKey, slotElement, currentSubject);
+    openMobileSubjectEditor(dayKey, periodKey, slotElement, currentSubject, currentRoom);
   } else {
-    openDesktopSubjectEditor(dayKey, periodKey, slotElement, currentSubject);
+    openDesktopSubjectEditor(dayKey, periodKey, slotElement, currentSubject, currentRoom);
   }
 }
 
-function openDesktopSubjectEditor(dayKey, periodKey, slotElement, currentSubject) {
+function openDesktopSubjectEditor(dayKey, periodKey, slotElement, currentSubject, currentRoom) {
   const editor = document.createElement("div");
   editor.className = "timetable_editor";
   
@@ -2553,20 +2586,41 @@ function openDesktopSubjectEditor(dayKey, periodKey, slotElement, currentSubject
   select.addEventListener("click", (e) => {
     e.stopPropagation();
   });
-  
+
+  const roomInput = document.createElement("input");
+  roomInput.type = "text";
+  roomInput.className = "timetable_editor_room_input";
+  roomInput.placeholder = t("roomPlaceholder");
+  roomInput.value = currentRoom || "";
+  roomInput.setAttribute("aria-label", t("room"));
+  roomInput.addEventListener("mousedown", (e) => {
+    e.stopPropagation();
+  });
+  roomInput.addEventListener("click", (e) => {
+    e.stopPropagation();
+  });
+
   const saveBtn = document.createElement("button");
   saveBtn.className = "timetable_editor_btn";
-  saveBtn.textContent = "Save";
+  saveBtn.textContent = currentLanguage === "vi" ? "Lưu" : "Save";
   saveBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     const selectedSubject = select.value;
+    const room = roomInput.value.trim();
     const day = TIMETABLE[dayKey] || [];
     const existingIndex = day.findIndex((entry) => entry.period === periodKey);
     
     if (existingIndex >= 0) {
       day[existingIndex].subject = selectedSubject;
+      if (room) {
+        day[existingIndex].room = room;
+      } else {
+        delete day[existingIndex].room;
+      }
     } else {
-      day.push({ period: periodKey, subject: selectedSubject });
+      const entry = { period: periodKey, subject: selectedSubject };
+      if (room) entry.room = room;
+      day.push(entry);
     }
     
     TIMETABLE[dayKey] = day;
@@ -2576,7 +2630,7 @@ function openDesktopSubjectEditor(dayKey, periodKey, slotElement, currentSubject
   
   const cancelBtn = document.createElement("button");
   cancelBtn.className = "timetable_editor_btn";
-  cancelBtn.textContent = "Cancel";
+  cancelBtn.textContent = currentLanguage === "vi" ? "Hủy" : "Cancel";
   cancelBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     closeEditor(editor);
@@ -2591,7 +2645,7 @@ function openDesktopSubjectEditor(dayKey, periodKey, slotElement, currentSubject
     e.stopPropagation();
   });
   
-  editor.append(select, saveBtn, cancelBtn);
+  editor.append(select, roomInput, saveBtn, cancelBtn);
   slotElement.innerHTML = "";
   slotElement.appendChild(editor);
   
@@ -2599,7 +2653,7 @@ function openDesktopSubjectEditor(dayKey, periodKey, slotElement, currentSubject
   setTimeout(() => select.focus(), 0);
 }
 
-function openMobileSubjectEditor(dayKey, periodKey, slotElement, currentSubject) {
+function openMobileSubjectEditor(dayKey, periodKey, slotElement, currentSubject, currentRoom) {
   // Create modal overlay
   const modal = document.createElement("div");
   modal.className = "timetable_mobile_modal";
@@ -2635,6 +2689,14 @@ function openMobileSubjectEditor(dayKey, periodKey, slotElement, currentSubject)
     }
     select.appendChild(option);
   });
+
+  // Room input (full-width row 3)
+  const roomInput = document.createElement("input");
+  roomInput.type = "text";
+  roomInput.className = "timetable_mobile_room_input";
+  roomInput.placeholder = t("roomPlaceholder");
+  roomInput.value = currentRoom || "";
+  roomInput.setAttribute("aria-label", t("room"));
   
   // Save button (right column, row 1)
   const saveBtn = document.createElement("button");
@@ -2642,19 +2704,27 @@ function openMobileSubjectEditor(dayKey, periodKey, slotElement, currentSubject)
   saveBtn.textContent = currentLanguage === "vi" ? "Lưu" : "Save";
   saveBtn.addEventListener("click", () => {
     const selectedSubject = select.value;
+    const room = roomInput.value.trim();
     const day = TIMETABLE[dayKey] || [];
     const existingIndex = day.findIndex((entry) => entry.period === periodKey);
     
     if (existingIndex >= 0) {
       day[existingIndex].subject = selectedSubject;
+      if (room) {
+        day[existingIndex].room = room;
+      } else {
+        delete day[existingIndex].room;
+      }
     } else {
-      day.push({ period: periodKey, subject: selectedSubject });
+      const entry = { period: periodKey, subject: selectedSubject };
+      if (room) entry.room = room;
+      day.push(entry);
     }
     
     TIMETABLE[dayKey] = day;
     saveTimetable(TIMETABLE);
-    modal.remove();
-    renderTimetable();
+    closeMobileSubjectEditor(modal);
+    renderTimetable(true);
   });
   
   // Cancel button (right column, row 2)
@@ -2662,7 +2732,7 @@ function openMobileSubjectEditor(dayKey, periodKey, slotElement, currentSubject)
   cancelBtn.className = "timetable_mobile_btn timetable_mobile_btn_cancel";
   cancelBtn.textContent = currentLanguage === "vi" ? "Hủy" : "Cancel";
   cancelBtn.addEventListener("click", () => {
-    modal.remove();
+    closeMobileSubjectEditor(modal);
   });
   
   // Button container for grid layout
@@ -2671,20 +2741,38 @@ function openMobileSubjectEditor(dayKey, periodKey, slotElement, currentSubject)
   buttons.append(saveBtn, cancelBtn);
   
   // Assemble grid layout - order matters for CSS grid placement
-  modalContent.append(periodInfo, currentSubjectText, select, buttons);
+  modalContent.append(periodInfo, currentSubjectText, select, roomInput, buttons);
   modal.appendChild(modalContent);
   
   // Close modal when clicking outside
   modal.addEventListener("click", (e) => {
     if (e.target === modal) {
-      modal.remove();
+      closeMobileSubjectEditor(modal);
     }
   });
+
+  // Close on Escape (desktop keyboards, iPad)
+  modal._escHandler = (e) => {
+    if (e.key === "Escape") closeMobileSubjectEditor(modal);
+  };
+  document.addEventListener("keydown", modal._escHandler);
   
   document.body.appendChild(modal);
+
+  // Prevent background scrolling while the modal is open
+  document.body.classList.add("timetable_modal_open");
   
-  // Auto-focus select
-  setTimeout(() => select.focus(), 100);
+  // Focus the modal itself (not the select) so iOS does not instantly pop
+  // the native picker and cover the Save/Cancel buttons.
+  modal.tabIndex = -1;
+  modal.focus();
+}
+
+function closeMobileSubjectEditor(modal) {
+  if (!modal || !modal.isConnected) return;
+  document.removeEventListener("keydown", modal._escHandler);
+  modal.remove();
+  document.body.classList.remove("timetable_modal_open");
 }
 
 function closeEditor(editor) {
@@ -2707,7 +2795,7 @@ function toggleTimetableEditMode() {
   if (editBtn) {
     editBtn.classList.toggle("timetable_edit_btn_active", timetableEditMode);
   }
-  renderTimetable();
+  renderTimetable(true);
 }
 
 // ── Overview ────────────────────────────────────────────────────
@@ -3016,6 +3104,7 @@ function updateWeekOverview(data) {
     weekCard.setAttribute("role", "button");
     const weekLabel = weekSummary.week === 0 ? t("overviewWeekGeneral") : `${t("week")} ${weekSummary.week}`;
     weekCard.title = `Go to ${weekLabel}`;
+    weekCard.setAttribute("aria-label", `Go to ${weekLabel}`);
 
     weekCard.addEventListener("click", () => {
       currentWeek = weekSummary.week;
@@ -3080,6 +3169,8 @@ function renderTimetableView() {
   if (timetableTab) timetableTab.textContent = t("timetable");
   if (timetableTitle) timetableTitle.textContent = t("timetableTitle");
   if (timetableNote) timetableNote.textContent = t("timetableNote");
+  const timetableOpenBtnText = document.querySelector(".timetable_open_btn_text");
+  if (timetableOpenBtnText) timetableOpenBtnText.textContent = t("openTimetable");
 }
 
 function renderAll() {
@@ -3259,40 +3350,56 @@ if (document.readyState === "loading") {
   attachWeekNavListeners();
 }
 
+function applyWeekFromInput() {
+  const value = Number(weekInput.value);
+  if (!Number.isFinite(value) || value < 0) {
+    updateWeekNav();
+    return;
+  }
+  if (value === currentWeek) {
+    updateWeekNav();
+    return;
+  }
+
+  currentWeek = value;
+  storageSet("selectedWeek", String(currentWeek));
+  showSkeletonLoading();
+  setFiltersEnabled(false);
+  loadItems().finally(() => {
+    setFiltersEnabled(true);
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+}
+
 weekInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
-    const value = Number(weekInput.value);
-    if (!Number.isFinite(value) || value < 0) {
-      updateWeekNav();
-      return;
-    }
-
-    currentWeek = value;
-    storageSet("selectedWeek", String(currentWeek));
-    showSkeletonLoading();
-    setFiltersEnabled(false);
-    loadItems().finally(() => {
-      setFiltersEnabled(true);
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
-    });
+    applyWeekFromInput();
   }
 });
 
-weekInput.addEventListener("blur", () => {
-  updateWeekNav();
-});
+// iOS has no Enter/"Go" on the number keyboard — the value only commits on
+// blur/change, so handle those (idempotently) as well.
+weekInput.addEventListener("change", applyWeekFromInput);
+weekInput.addEventListener("blur", applyWeekFromInput);
 
 document.addEventListener("keydown", (event) => {
-  if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA" || event.target.isContentEditable) {
+  // Don't hijack typing inside inputs, textareas, contenteditable, selects,
+  // or buttons/checkbox labels (e.g. a focused toggle while space/enter pressed).
+  const tag = event.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON" || event.target.isContentEditable) {
     return;
   }
 
   // Don't navigate weeks if the setup overlay is open
   const overlay = document.getElementById("setup_overlay");
   if (overlay && !overlay.hidden) return;
+
+  // Don't trigger shortcuts while any modal/dialog is open
+  const openModals = document.querySelectorAll(".token_settings_modal:not([hidden]), .timetable_mobile_modal, .token_warning:not([hidden])");
+  if (openModals.length > 0) return;
 
   if (event.key === "ArrowLeft" || event.key === "j") {
     event.preventDefault();
@@ -4570,26 +4677,55 @@ if ('serviceWorker' in navigator) {
 
 // Add swipe gesture for mobile timetable
 let touchStartX = 0;
+let touchStartY = 0;
 let touchEndX = 0;
+let touchEndY = 0;
 
 timetableMobile.addEventListener("touchstart", (e) => {
-  touchStartX = e.changedTouches[0].screenX;
+  _lastTimetableInteraction = Date.now();
+  const touch = e.changedTouches[0];
+  touchStartX = touch.screenX;
+  touchStartY = touch.screenY;
+  touchEndX = touchStartX;
+  touchEndY = touchStartY;
 }, { passive: true });
 
-timetableMobile.addEventListener("touchend", (e) => {
-  touchEndX = e.changedTouches[0].screenX;
+timetableMobile.addEventListener("touchmove", (e) => {
+  _lastTimetableInteraction = Date.now();
+  // Track the last position so the swipe delta is the final drift
+  const touch = e.changedTouches[0];
+  touchEndX = touch.screenX;
+  touchEndY = touch.screenY;
+}, { passive: true });
+
+timetableMobile.addEventListener("scroll", () => {
+  _lastTimetableInteraction = Date.now();
+}, { passive: true });
+
+timetableMobile.addEventListener("touchend", () => {
   handleSwipe();
+}, { passive: true });
+
+timetableMobile.addEventListener("touchcancel", () => {
+  touchStartX = 0;
+  touchStartY = 0;
+  touchEndX = 0;
+  touchEndY = 0;
 }, { passive: true });
 
 function handleSwipe() {
   const swipeThreshold = 50;
   const diff = touchStartX - touchEndX;
-  
-  if (Math.abs(diff) < swipeThreshold) return;
-  
+  const diffY = touchEndY - touchStartY;
+
+  // Only treat as a horizontal swipe when the horizontal drift clearly
+  // dominates vertical drift — otherwise a diagonal vertical scroll would
+  // accidentally flip the view.
+  if (Math.abs(diff) < swipeThreshold || Math.abs(diff) < Math.abs(diffY) * 1.5) return;
+
   const todayKey = todayDayKey();
   if (!todayKey) return;
-  
+
   // Swipe left: show full week, Swipe right: show today
   if (diff > 0 && timetableMobileView === "today") {
     // Swipe left - switch to full week
@@ -4604,6 +4740,11 @@ function handleSwipe() {
     updateTimetableViewToggleButtons();
     renderTimetableMobile();
   }
+
+  touchStartX = 0;
+  touchStartY = 0;
+  touchEndX = 0;
+  touchEndY = 0;
 }
 
 function updateTimetableViewToggleButtons() {

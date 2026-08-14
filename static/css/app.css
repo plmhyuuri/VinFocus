@@ -992,13 +992,13 @@ body::before {
         width: 100%;
     }
     
-    .input-wrapper {
+    .hub_container .input-wrapper {
         position: relative;
         width: 100%;
     }
     
-    .input-wrapper:focus-within,
-    .input-wrapper.has-value {
+    .hub_container .input-wrapper:focus-within,
+    .hub_container .input-wrapper.has-value {
         width: 100%;
         max-width: 100%;
     }
@@ -1746,6 +1746,48 @@ body.light .item_row_important {
     position: relative;
 }
 
+.timetable_header_actions {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.timetable_header_actions .timetable_edit_btn {
+    position: static;
+}
+
+.timetable_open_btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: var(--btn-white);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: var(--transition-all-fast);
+    min-height: 36px;
+    white-space: nowrap;
+}
+
+.timetable_open_btn:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: var(--btn-white);
+}
+
+.timetable_open_btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
 .timetable_edit_btn {
     position: absolute;
     top: 0;
@@ -1914,6 +1956,19 @@ body.light .edit_icon {
     color: var(--text-primary);
     font-size: 0.85rem;
     cursor: pointer;
+}
+
+.timetable_editor_room_input {
+    padding: 6px 8px;
+    border: 1px solid var(--border-input);
+    border-radius: var(--radius-xs);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.timetable_editor_room_input::placeholder {
+    color: var(--text-muted);
 }
 
 .timetable_editor_btn {
@@ -2447,7 +2502,7 @@ body.light .theme_icon_moon {
         font-size: 1.2rem;
     }
 
-    .input-wrapper {
+    .hub_container .input-wrapper {
         grid-area: search;
         position: relative;
         justify-self: center;
@@ -2458,13 +2513,14 @@ body.light .theme_icon_moon {
         transition: width 500ms cubic-bezier(0, 0.11, 0.35, 2);
     }
 
-    .input-wrapper:focus-within {
+    .hub_container .input-wrapper:focus-within,
+    .hub_container .input-wrapper.has-value {
         width: 100%;
         max-width: 100%;
     }
 
-    .input-wrapper:focus-within .input,
-    .input-wrapper.has-value .input {
+    .hub_container .input-wrapper:focus-within .input,
+    .hub_container .input-wrapper.has-value .input {
         width: 100%;
         max-width: 100%;
         border-radius: 20px;
@@ -2529,7 +2585,14 @@ body.light .theme_icon_moon {
 
     .timetable_title_section {
         text-align: center;
-        padding-right: 40px;
+        padding-right: 0;
+    }
+
+    .timetable_header_actions {
+        position: static;
+        justify-content: center;
+        width: 100%;
+        margin-top: 4px;
     }
     
     .timetable_editor {
@@ -2538,6 +2601,12 @@ body.light .theme_icon_moon {
     }
     
     .timetable_editor_select {
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: 10px;
+        min-height: 44px; /* Better touch target */
+    }
+
+    .timetable_editor_room_input {
         font-size: 16px; /* Prevents zoom on iOS */
         padding: 10px;
         min-height: 44px; /* Better touch target */
@@ -2606,7 +2675,7 @@ body.light .theme_icon_moon {
     animation: slideUp 0.3s ease;
     display: grid;
     grid-template-columns: 1fr 2fr 1fr;
-    grid-template-rows: auto auto;
+    grid-template-rows: auto auto auto;
     gap: var(--gap-md);
 }
 
@@ -2638,6 +2707,23 @@ body.light .theme_icon_moon {
     font-size: 16px;
     cursor: pointer;
     min-height: 50px;
+}
+
+.timetable_mobile_room_input {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid var(--border-input);
+    border-radius: var(--radius-md);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 16px;
+    min-height: 50px;
+}
+
+.timetable_mobile_room_input::placeholder {
+    color: var(--text-muted);
 }
 
 .timetable_mobile_btn_save {
@@ -4302,4 +4388,102 @@ select:focus-visible {
 
 .offline_banner[hidden] {
     display: none !important;
+}
+
+/* ── Mobile input sizing / layout refinements ────────────────── */
+
+@media (max-width: 900px) {
+    /* iOS zooms the page when an input's font-size is < 16px */
+    .week_input_inline,
+    .setup_token_input,
+    .subject_label_input,
+    .feedback_textarea {
+        font-size: 16px;
+    }
+
+    .about_footer {
+        grid-template-columns: 1fr;
+        gap: 24px;
+    }
+
+    .token_settings_content {
+        max-height: 85vh;
+        overflow-y: auto;
+    }
+
+    .timetable_edit_btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .subject_label_edit_btn {
+        width: 40px;
+        height: 40px;
+        padding: 6px;
+    }
+}
+
+/* Consistent 44px touch targets for the fixed corner controls */
+@media (max-width: 900px) {
+    .toolbar_btn,
+    .language_toggle,
+    .token_settings_btn {
+        width: 40px;
+        height: 40px;
+        padding: 8px;
+    }
+}
+
+/* Very small phones: stack the editor modal so it never overflows */
+@media (max-width: 360px) {
+    .view_tab {
+        padding: 10px 10px 8px;
+    }
+
+    .timetable_mobile_modal_content {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto auto auto;
+        padding: 16px;
+    }
+
+    .timetable_mobile_period_info {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .timetable_mobile_current_subject {
+        grid-column: 1;
+        grid-row: 2;
+    }
+
+    .timetable_mobile_select {
+        grid-column: 1;
+        grid-row: 3;
+    }
+
+    .timetable_mobile_room_input {
+        grid-column: 1;
+        grid-row: 4;
+    }
+
+    .timetable_mobile_buttons {
+        grid-column: 1;
+        grid-row: 5;
+        display: flex;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .timetable_mobile_btn {
+        flex: 1;
+    }
+}
+
+/* Keep the offline pill clear of the consent banner when both show */
+body:has(.consent_banner:not([hidden])) .offline_banner {
+    bottom: 180px;
+}
+
+body.timetable_modal_open {
+    overflow: hidden;
 }

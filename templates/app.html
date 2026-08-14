@@ -332,9 +332,15 @@
                         <h2 id="timetable_title">Weekly Timetable</h2>
                         <p id="timetable_note" class="timetable_note">Manual schedule stored locally in this app.</p>
                     </div>
-                    <button id="timetable_edit_btn" type="button" class="timetable_edit_btn" aria-label="Edit timetable">
-                        <img src="/static/images/edit_icon.png" alt="" class="edit_icon">
-                    </button>
+                    <div class="timetable_header_actions">
+                        <button id="timetable_edit_btn" type="button" class="timetable_edit_btn" aria-label="Edit timetable" title="Edit timetable">
+                            <img src="/static/images/edit_icon.png" alt="" class="edit_icon">
+                        </button>
+                        <a id="timetable_open_btn" class="timetable_open_btn" href="https://lms.vinschool.edu.vn/accounts/1/external_tools/236?launch_type=global_navigation&amp;toolId=vsc-timetable-236" target="_blank" rel="noopener noreferrer">
+                            <span class="timetable_open_btn_text">Open timetable</span>
+                            <span class="timetable_open_btn_arrow" aria-hidden="true">↗</span>
+                        </a>
+                    </div>
                 </div>
 
                 <div id="timetable_view_toggle" class="timetable_view_toggle">

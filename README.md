@@ -3,7 +3,7 @@
 
 VinFocus is a personal information hub for Vinschool's Canvas LMS, designed for Vinschool students. It aggregates course modules and items into a cleaner interface so you can browse what exists — without trying to predict what you should do on a given day.
 
-## Demo
+## Demo (old, will be updated later)
 
 https://github.com/user-attachments/assets/c0bf2085-5e51-4b41-b13e-41436c0d9945
 
@@ -86,7 +86,9 @@ VinFocus doesn't replace Canvas. It reorganizes the same information into a fast
 - Current period and today column highlighting
 - Next period highlighting
 - Inline editing with desktop dropdown and mobile modal
+- Per-period room numbers displayed under each subject
 - Today vs full week view toggle on mobile
+- One-click button to open the official VSC-Timetable schedule
 - Data stored locally in browser
 
 ### About View
@@ -332,9 +334,8 @@ curl -H "X-Admin-Key: your-secret-key-here" http://127.0.0.1:5000/api/feedback
 
 ## Future Plans
 
-- Automatic timetable import from VSC Timetable (will implement when school starts)
-- Cross-course global search
-- Resource page
+- Automatic timetable import from VSC Timetable (currently only linked via the "Open timetable" button)
+- Cross-course global search (Experimental)
 - Redesign Settings' UI
 - Split view mode (Experimental)
 
