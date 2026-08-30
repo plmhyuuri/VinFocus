@@ -258,6 +258,10 @@ const TRANSLATIONS = {
     timetableTitle: "Weekly Timetable",
     timetableNote: "Manual schedule stored locally in this app.",
     openTimetable: "Open timetable",
+    loadExampleSchedule: "Load Example Schedule",
+    loadExampleConfirm: "Replace your current timetable with the example schedule?",
+    timetableEmptyHint: "Your timetable is empty. Press the pencil to add your classes, or load the example schedule while editing.",
+    clearSlot: "Empty",
     room: "Room",
     roomPlaceholder: "Room (e.g. B3-201)",
     items: "items",
@@ -279,7 +283,7 @@ const TRANSLATIONS = {
     setupSkip: "I already have a token",
     setupCloseWarning: "You haven't set up a Canvas API token yet, so the app can't load your course data. If you want to set up the token later, open Settings (the gear icon) and choose API Token Settings.",
     setupTokenLabel: "Paste your API token here",
-    setupTokenPlaceholder: "Paste your Canvas API token...",
+    setupTokenPlaceholder: "Paste API token…",
     setupValidate: "Validate & Save",
     setupValidating: "Validating...",
     setupSuccess: "Token saved successfully!",
@@ -502,6 +506,10 @@ const TRANSLATIONS = {
     timetableTitle: "Thời Khóa Biểu Tuần",
     timetableNote: "Lịch học được lưu cục bộ trong ứng dụng này.",
     openTimetable: "Mở thời khóa biểu",
+    loadExampleSchedule: "Tải Lịch Mẫu",
+    loadExampleConfirm: "Thay thế thời khóa biểu hiện tại bằng lịch mẫu?",
+    timetableEmptyHint: "Thời khóa biểu của bạn đang trống. Bấm bút chì để thêm lớp học, hoặc tải lịch mẫu khi đang chỉnh sửa.",
+    clearSlot: "Trống",
     room: "Phòng",
     roomPlaceholder: "Phòng (vd. B3-201)",
     items: "bài",
@@ -523,7 +531,7 @@ const TRANSLATIONS = {
     setupSkip: "Tôi đã có mã",
     setupCloseWarning: "Bạn chưa thiết lập mã API Canvas, nên ứng dụng không thể tải dữ liệu khóa học của bạn. Nếu muốn thiết lập mã sau, hãy mở Cài Đặt (biểu tượng bánh răng) và chọn Cài Đặt Mã API.",
     setupTokenLabel: "Dán mã API của bạn vào đây",
-    setupTokenPlaceholder: "Dán mã Canvas API...",
+    setupTokenPlaceholder: "Dán mã API…",
     setupValidate: "Xác thực & Lưu",
     setupValidating: "Đang xác thực...",
     setupSuccess: "Đã lưu mã thành công!",
@@ -883,7 +891,9 @@ function loadTimetable() {
   } catch {
     // ignore parse errors
   }
-  return JSON.parse(JSON.stringify(DEFAULT_TIMETABLE));
+  // New users start with an empty timetable. The example schedule is only
+  // loaded on demand via the "Load Example Schedule" button in edit mode.
+  return {};
 }
 
 function saveTimetable(timetable) {
@@ -2532,6 +2542,8 @@ function renderTimetable(force) {
   const nextPeriod = nextPeriodKey();
   const stateKey = `${todayKey}|${currentPeriod}|${nextPeriod}|${currentLanguage}|${timetableEditMode}`;
 
+  updateTimetableEmptyHint();
+
   // Skip re-render if nothing changed (avoids flicker on the 15s tick),
   // unless a render was explicitly forced (e.g. after an edit/save).
   if (!force && _lastIndicatorState === stateKey) return;
@@ -2541,6 +2553,23 @@ function renderTimetable(force) {
   renderTimetableGrid();
   renderTimetableMobile();
   updateTimetableViewToggleButtons();
+}
+
+function hasAnyClasses() {
+  return TIMETABLE_DAYS.some((day) => (TIMETABLE[day.key] || []).some((entry) => entry.subject));
+}
+
+function updateTimetableEmptyHint() {
+  const hint = document.getElementById("timetable_empty_hint");
+  if (!hint) return;
+  hint.hidden = hasAnyClasses();
+}
+
+function loadExampleSchedule() {
+  if (!confirm(t("loadExampleConfirm"))) return;
+  TIMETABLE = JSON.parse(JSON.stringify(DEFAULT_TIMETABLE));
+  saveTimetable(TIMETABLE);
+  renderTimetable(true);
 }
 
 function isMobile() {
@@ -2567,6 +2596,14 @@ function openDesktopSubjectEditor(dayKey, periodKey, slotElement, currentSubject
   const select = document.createElement("select");
   select.className = "timetable_editor_select";
   
+  const emptyOption = document.createElement("option");
+  emptyOption.value = "";
+  emptyOption.textContent = t("clearSlot");
+  if (!currentSubject) {
+    emptyOption.selected = true;
+  }
+  select.appendChild(emptyOption);
+
   const allSubjects = Object.keys(SUBJECT_LABELS[currentLanguage] || {});
   allSubjects.forEach((subjectId) => {
     const option = document.createElement("option");
@@ -2609,8 +2646,14 @@ function openDesktopSubjectEditor(dayKey, periodKey, slotElement, currentSubject
     const room = roomInput.value.trim();
     const day = TIMETABLE[dayKey] || [];
     const existingIndex = day.findIndex((entry) => entry.period === periodKey);
-    
-    if (existingIndex >= 0) {
+
+    if (!selectedSubject) {
+      // "Empty" chosen — remove this period entirely (subject + room).
+      if (existingIndex >= 0) {
+        day.splice(existingIndex, 1);
+        TIMETABLE[dayKey] = day;
+      }
+    } else if (existingIndex >= 0) {
       day[existingIndex].subject = selectedSubject;
       if (room) {
         day[existingIndex].room = room;
@@ -2678,6 +2721,14 @@ function openMobileSubjectEditor(dayKey, periodKey, slotElement, currentSubject,
   // Subject selector (middle column, spans rows 1-2)
   const select = document.createElement("select");
   select.className = "timetable_mobile_select";
+
+  const emptyOption = document.createElement("option");
+  emptyOption.value = "";
+  emptyOption.textContent = t("clearSlot");
+  if (!currentSubject) {
+    emptyOption.selected = true;
+  }
+  select.appendChild(emptyOption);
   
   const allSubjects = Object.keys(SUBJECT_LABELS[currentLanguage] || {});
   allSubjects.forEach((subjectId) => {
@@ -2707,8 +2758,14 @@ function openMobileSubjectEditor(dayKey, periodKey, slotElement, currentSubject,
     const room = roomInput.value.trim();
     const day = TIMETABLE[dayKey] || [];
     const existingIndex = day.findIndex((entry) => entry.period === periodKey);
-    
-    if (existingIndex >= 0) {
+
+    if (!selectedSubject) {
+      // "Empty" chosen — remove this period entirely (subject + room).
+      if (existingIndex >= 0) {
+        day.splice(existingIndex, 1);
+        TIMETABLE[dayKey] = day;
+      }
+    } else if (existingIndex >= 0) {
       day[existingIndex].subject = selectedSubject;
       if (room) {
         day[existingIndex].room = room;
@@ -2787,6 +2844,7 @@ function closeEditor(editor) {
     slotElement.appendChild(createSlotContent(period, entry || { subject: "" }));
   }
   editor.remove();
+  updateTimetableEmptyHint();
 }
 
 function toggleTimetableEditMode() {
@@ -2794,6 +2852,10 @@ function toggleTimetableEditMode() {
   const editBtn = document.getElementById("timetable_edit_btn");
   if (editBtn) {
     editBtn.classList.toggle("timetable_edit_btn_active", timetableEditMode);
+  }
+  const exampleBtn = document.getElementById("timetable_example_btn");
+  if (exampleBtn) {
+    exampleBtn.hidden = !timetableEditMode;
   }
   renderTimetable(true);
 }
@@ -3171,6 +3233,10 @@ function renderTimetableView() {
   if (timetableNote) timetableNote.textContent = t("timetableNote");
   const timetableOpenBtnText = document.querySelector(".timetable_open_btn_text");
   if (timetableOpenBtnText) timetableOpenBtnText.textContent = t("openTimetable");
+  const timetableExampleBtnText = document.getElementById("timetable_example_btn_text");
+  if (timetableExampleBtnText) timetableExampleBtnText.textContent = t("loadExampleSchedule");
+  const timetableEmptyHint = document.getElementById("timetable_empty_hint");
+  if (timetableEmptyHint) timetableEmptyHint.textContent = t("timetableEmptyHint");
 }
 
 function renderAll() {
@@ -3476,6 +3542,11 @@ if (timetableEditBtn) {
   timetableEditBtn.addEventListener("click", toggleTimetableEditMode);
 }
 
+const timetableExampleBtn = document.getElementById("timetable_example_btn");
+if (timetableExampleBtn) {
+  timetableExampleBtn.addEventListener("click", loadExampleSchedule);
+}
+
 // Mobile timetable view toggle (Today/Full Week)
 const timetableViewToggleBtns = document.querySelectorAll(".timetable_view_toggle_btn");
 timetableViewToggleBtns.forEach((btn) => {
@@ -3556,13 +3627,16 @@ function renderSetupStep(stepIndex) {
   title.textContent = t(step.titleKey);
   content.appendChild(title);
 
-  // Screenshot — one per step, mapped 1:1 (step 1 → setup_step0.jpg, ..., step 7 → setup_step6.jpg)
-  const screenshot = document.createElement("img");
-  screenshot.className = "setup_screenshot";
-  screenshot.src = `/static/images/setup_step${stepIndex + 1}.jpg`;
-  screenshot.alt = t(step.titleKey);
-  screenshot.loading = "lazy";
-  content.appendChild(screenshot);
+  // Screenshot — one per step, mapped 1:1 (step 1 → setup_step0.jpg, ..., step 7 → setup_step6.jpg).
+  // Not shown on the final security step (token entry).
+  if (!step.isSecurity) {
+    const screenshot = document.createElement("img");
+    screenshot.className = "setup_screenshot";
+    screenshot.src = `/static/images/setup_step${stepIndex + 1}.jpg`;
+    screenshot.alt = t(step.titleKey);
+    screenshot.loading = "lazy";
+    content.appendChild(screenshot);
+  }
 
   // Description
   if (!step.isSecurity) {

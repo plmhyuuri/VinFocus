@@ -1,7 +1,7 @@
 import json
 import pytest
 from unittest.mock import patch, MagicMock
-from main import app, extract_weeks, get_item_completion, format_module_item
+from main import app, extract_weeks, get_item_completion, format_module_item, module_item_weeks
 
 
 @pytest.fixture
@@ -153,6 +153,127 @@ class TestExtractWeeks:
 
 
 # ──────────────────────────────────────────────
+# Unit tests for module_item_weeks (SubHeader week inheritance)
+# ──────────────────────────────────────────────
+
+def helper_item(item_type, title, position, item_id):
+    return {"id": item_id, "type": item_type, "title": title, "position": position}
+
+
+def week_by_item_id(result, item_id):
+    for item, weeks, _label in result:
+        if item.get("id") == item_id:
+            return weeks
+    return None
+
+
+def label_by_item_id(result, item_id):
+    for item, _weeks, label in result:
+        if item.get("id") == item_id:
+            return label
+    return None
+
+
+class TestModuleItemWeeks:
+    def test_normal_week_named_module(self):
+        """Week-named modules keep their existing behavior (no subheaders)."""
+        module = {
+            "name": "TUẦN 36",
+            "items": [
+                helper_item("Quiz", "Quiz 1", 1, 100),
+                helper_item("Page", "Page 1", 2, 101),
+            ],
+        }
+        result = module_item_weeks(module)
+        assert week_by_item_id(result, 100) == [36]
+        assert week_by_item_id(result, 101) == [36]
+        assert label_by_item_id(result, 100) == "TUẦN 36"
+
+    def test_chapter_module_with_subheader_assigns_weeks(self):
+        """A chapter-named module uses SubHeader weeks for trailing items."""
+        module = {
+            "name": "CHƯƠNG 8: Sự hô hấp và Trao đổi khí new",
+            "items": [
+                helper_item("SubHeader", "Tuần 1 (13.8-21.8.2026) B8.1 Hô Hấp", 1, 1),
+                helper_item("Page", "[Tự học] B8.01: Hô hấp", 2, 100),
+                helper_item("Quiz", "[Quiz củng cố] B8.01: Hô hấp", 3, 101),
+            ],
+        }
+        result = module_item_weeks(module)
+        assert week_by_item_id(result, 100) == [1]
+        assert week_by_item_id(result, 101) == [1]
+        # Option B: label is the sub-header title
+        assert label_by_item_id(result, 100) == "Tuần 1 (13.8-21.8.2026) B8.1 Hô Hấp"
+
+    def test_inherited_through_non_week_subheader(self):
+        """Items under a non-week sub-header inherit the prior sub-header's weeks."""
+        module = {
+            "name": "CHƯƠNG 8",
+            "items": [
+                helper_item("SubHeader", "Tuần 2 (24.8 - 28.8.2026) B8.3: Thuốc lá", 1, 1),
+                helper_item("Page", "[Tự học] B8.03", 2, 100),
+                helper_item("SubHeader", "[Nội dung bài học]", 3, 2),
+                helper_item("Page", "Sự trao đổi khí ở người", 4, 101),
+                helper_item("SubHeader", "Luyện tập", 5, 3),
+                helper_item("Quiz", "[Quiz củng cố] B8.02", 6, 102),
+            ],
+        }
+        result = module_item_weeks(module)
+        assert week_by_item_id(result, 100) == [2]
+        # No-week subheaders: next real items keep previous weeks (2)
+        assert week_by_item_id(result, 101) == [2]
+        assert week_by_item_id(result, 102) == [2]
+
+    def test_multi_week_subheader(self):
+        """A sub-header spanning multiple weeks assigns those weeks to its items."""
+        module = {
+            "name": "CHƯƠNG 8",
+            "items": [
+                helper_item("SubHeader", "Tuần 1,2 (17.8 - 28.8.2026) B8.2", 1, 1),
+                helper_item("Page", "Trao đổi khí - Tiết 1", 2, 100),
+                helper_item("Quiz", "Quiz tự học", 3, 101),
+            ],
+        }
+        result = module_item_weeks(module)
+        assert week_by_item_id(result, 100) == [1, 2]
+        assert week_by_item_id(result, 101) == [1, 2]
+
+    def test_items_before_first_subheader_fallback_to_module(self):
+        """Items before any sub-header fall back to the module name (week 0 if none)."""
+        module = {
+            "name": "CHƯƠNG 8",
+            "items": [
+                helper_item("Page", "Intro page before headers", 1, 100),
+                helper_item("SubHeader", "Tuần 5", 2, 1),
+                helper_item("Quiz", "In week 5", 3, 101),
+            ],
+        }
+        result = module_item_weeks(module)
+        # Intro page has no module week and predates any subheader => week 0
+        assert week_by_item_id(result, 100) == [0]
+        # After the subheader, items inherit week 5
+        assert week_by_item_id(result, 101) == [5]
+
+    def test_empty_items(self):
+        module = {"name": "TUẦN 36", "items": []}
+        assert module_item_weeks(module) == []
+
+    def test_items_sorted_by_position(self):
+        """Items are processed in position order regardless of API ordering."""
+        module = {
+            "name": "CHƯƠNG 8",
+            "items": [
+                helper_item("Quiz", "Item B (position 3)", 3, 102),
+                helper_item("SubHeader", "Tuần 7", 2, 1),
+                helper_item("Page", "Item A (position 1)", 1, 100),
+            ],
+        }
+        result = module_item_weeks(module)
+        assert week_by_item_id(result, 100) == [0]  # before the subheader
+        assert week_by_item_id(result, 102) == [7]  # after the subheader
+
+
+# ──────────────────────────────────────────────
 # Integration tests for API endpoints
 # ──────────────────────────────────────────────
 
@@ -295,6 +416,31 @@ class TestListCourseWeeks:
         assert response.status_code == 200
         data = response.get_json()
         assert data["weeks"] == [23, 24, 25]
+
+    @patch("main.get_canvas_headers")
+    @patch("main.canvas_get")
+    def test_list_weeks_from_subheaders(self, mock_canvas_get, mock_get_headers, client):
+        """Week pills are derived from SubHeader items inside chapter modules."""
+        mock_get_headers.return_value = {"Authorization": "Bearer test"}
+        mock_canvas_get.return_value = (
+            [
+                {
+                    "id": 1,
+                    "name": "CHƯƠNG 8: Sự hô hấp và Trao đổi khí new",
+                    "items": [
+                        {"id": 1, "type": "SubHeader", "title": "Tuần 1 (13.8-21.8.2026) B8.1", "position": 1},
+                        {"id": 2, "type": "SubHeader", "title": "Tuần 1,2 (17.8-28.8) B8.2", "position": 2},
+                        {"id": 100, "type": "Page", "title": "Page", "position": 3},
+                    ],
+                },
+            ],
+            None,
+        )
+
+        response = client.get("/api/courses/1/weeks")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["weeks"] == [1, 2]
 
 
 class TestGetCourseWeek:
@@ -550,6 +696,51 @@ class TestCourseOverview:
         assert data["week_count"] == 0
         assert data["weeks"] == []
         assert data["totals"]["total"] == 0
+
+    @patch("main.get_canvas_headers")
+    @patch("main.get_course_name")
+    @patch("main.get_course_modules")
+    def test_overview_chapter_module_with_subheaders(self, mock_modules, mock_name, mock_headers, client):
+        """A chapter-named module with week-bearing sub-headers is bucketed by week."""
+        mock_headers.return_value = {"Authorization": "Bearer test"}
+        mock_name.return_value = "Biology"
+        mock_modules.return_value = (
+            [
+                {
+                    "name": "CHƯƠNG 8: Sự hô hấp và Trao đổi khí new",
+                    "items": [
+                        {"id": 1, "type": "SubHeader", "title": "Tuần 1 (13.8-21.8.2026) B8.1 Hô Hấp", "position": 1},
+                        {"id": 100, "type": "Page", "title": "[Tự học] B8.01: Hô hấp", "position": 2},
+                        {"id": 2, "type": "SubHeader", "title": "Tuần 1,2 (17.8 - 28.8.2026) B8.2", "position": 3},
+                        {"id": 101, "type": "Quiz", "title": "[Quiz tự học] trao đổi khí", "position": 4},
+                        {"id": 3, "type": "SubHeader", "title": "Luyện tập", "position": 5},
+                        {"id": 102, "type": "Quiz", "title": "[Quiz củng cố] B8.02", "position": 6},
+                    ],
+                },
+            ],
+            None,
+        )
+
+        response = client.get("/api/courses/1/overview")
+        assert response.status_code == 200
+        data = response.get_json()
+
+        weeks = {w["week"]: w for w in data["weeks"]}
+        # Week 1 gets the B8.01 page plus both B8.02 quizzes (B8.02 quiz spans
+        # weeks 1,2, and the củng cố quiz inherits 1,2 through "Luyện tập")
+        assert weeks[1]["total"] == 3
+        # Week 2 gets the B8.02 quiz (spans) plus the B8.02 củng cố quiz (inherited)
+        assert weeks[2]["total"] == 2
+        # No items are uncategorized
+        assert 0 not in weeks
+        assert data["uncategorized_unfinished_count"] == 0
+        # Items are counted once per assigned week (multi-week items double-count)
+        assert data["totals"]["total"] == 5
+
+        # Option B: items carry the sub-header title as their module label
+        week1_items = weeks[1]["items"]
+        # The overview items only expose a subset of fields, so verify via the
+        # full fetch path instead of the summary. Just assert totals above.
 
 
 class TestLegacyRoutes:

@@ -1424,11 +1424,10 @@ body.light .item_row_important {
 }
 
 .about_container h2 {
-    margin: 0 0 8px;
+    margin: 0 0 16px;
     font-size: 1.6rem;
     color: var(--text-primary);
     text-align: center;
-    margin-top: -16px
 }
 
 .about_section {
@@ -1786,6 +1785,33 @@ body.light .item_row_important {
 .timetable_open_btn:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+}
+
+.timetable_example_btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--border-pill);
+    border-radius: var(--radius-sm);
+    background: var(--bg-pill);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-all-fast);
+    min-height: 36px;
+    white-space: nowrap;
+}
+
+.timetable_example_btn:hover {
+    background: var(--bg-pill-hover);
+    border-color: var(--border-pill-hover);
+    color: var(--text-primary);
+}
+
+.timetable_example_btn[hidden] {
+    display: none !important;
 }
 
 .timetable_edit_btn {
@@ -2179,6 +2205,7 @@ body.light .edit_icon {
 
 .tc_header_sticky h2 {
     margin: 0;
+    padding: 0 44px;
     color: var(--text-primary);
     text-align: center;
     flex: 1;
@@ -2218,6 +2245,12 @@ body.light .edit_icon {
 
 #tc_title {
     font-size: 1.6rem
+}
+
+@media (max-width: 480px) {
+    .tc_header_sticky h2 {
+        font-size: 1.2rem;
+    }
 }
 
 /* ── Setup Wizard - T&C Agreement ────────────────────────────── */
@@ -2292,6 +2325,22 @@ body.light .edit_icon {
     border-radius: var(--radius-lg);
     background: var(--bg-empty);
     margin: 20px 0;
+}
+
+.timetable_empty_hint {
+    text-align: center;
+    padding: 20px 16px;
+    color: var(--text-muted-light);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    border: 1px dashed var(--border-dashed);
+    border-radius: var(--radius-lg);
+    background: var(--bg-empty);
+    margin: 0 0 18px;
+}
+
+.timetable_empty_hint[hidden] {
+    display: none !important;
 }
 
 .timetable_mobile {
@@ -2468,6 +2517,10 @@ body.light .theme_icon_moon {
         min-height: 0;
     }
 
+    .about_container {
+        padding: 32px 24px;
+    }
+
     .resource_header h2 {
         font-size: 1.35rem;
     }
@@ -2559,13 +2612,18 @@ body.light .theme_icon_moon {
 
     .app_nav {
         display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        row-gap: 4px;
         width: 100%;
         box-sizing: border-box;
     }
 
     .view_tab {
-        flex: 1;
+        flex: 0 0 auto;
         min-width: 0;
+        padding: 10px 14px 8px;
+        white-space: nowrap;
     }
 
     .hub_content {
@@ -2591,6 +2649,7 @@ body.light .theme_icon_moon {
     .timetable_header_actions {
         position: static;
         justify-content: center;
+        flex-wrap: wrap;
         width: 100%;
         margin-top: 4px;
     }
@@ -3012,6 +3071,15 @@ body.light .setup_warning {
     font-size: 1.15rem;
     color: var(--text-primary);
     line-height: 1.4;
+}
+
+.setup_screenshot {
+    width: 100%;
+    height: auto;
+    display: block;
+    margin-bottom: 16px;
+    border: 1px solid var(--border-primary);
+    border-radius: 12px;
 }
 
 .setup_screenshot_placeholder {

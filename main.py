@@ -616,31 +616,42 @@ def get_course_modules(course_id: int, headers: Dict[str, str], include_items: b
 
 
 def get_week_modules(course_id: int, week: int, headers: Dict[str, str]) -> Tuple[Optional[List[Dict]], Optional[requests.Response]]:
-    """Fetch modules for a specific week in a course.
-    
+    """Fetch modules that contain at least one item belonging to a specific week.
+
     Uses `include_items=True` to fetch all module items in a single API call,
-    then filters modules by week from the cached response.
-    
-    For week > 0: includes modules whose extracted weeks contain the requested week.
-    For week == 0: includes modules with no week information (General category).
+    then filters modules by the week numbers resolved per-item via
+    `module_item_weeks()` (which considers SubHeader week info).
+
+    For week > 0: includes modules where any item's resolved weeks contain the
+    requested week. For week == 0: includes modules with any item that could not
+    be resolved to a week (General category) OR whose items carry no week at all.
     """
     modules, response = get_course_modules(course_id, headers, include_items=True)
     if response is not None:
         return None, response
 
-    if week == 0:
-        # General: modules with no week information
-        week_modules = [
-            module
-            for module in modules
-            if not extract_weeks(module.get("name"))
-        ]
-    else:
-        week_modules = [
-            module
-            for module in modules
-            if week in extract_weeks(module.get("name"))
-        ]
+    week_modules = []
+    for module in modules:
+        module_items = module.get("items")
+        if not module_items:
+            # No items at all: only relevant for the uncategorized week.
+            if week == 0 and not extract_weeks(module.get("name")):
+                week_modules.append(module)
+            continue
+
+        item_weeks_list = module_item_weeks(module)
+        # Weeks resolved by sub-headers/module-name across this module's items.
+        resolves_to_week0 = any(weeks == [0] for _, weeks, _ in item_weeks_list)
+        matches_week = any(week in weeks for _, weeks, _ in item_weeks_list)
+
+        if week == 0:
+            # Include if any item is unresolvable (week 0) — but only if the
+            # module itself isn't purely a week-named module without subheaders.
+            if resolves_to_week0:
+                week_modules.append(module)
+        else:
+            if matches_week:
+                week_modules.append(module)
 
     return week_modules, None
 
@@ -699,14 +710,65 @@ def get_item_completion(item: Dict[str, Any]) -> Tuple[bool, bool]:
     return (completion.get("completed", False), True)
 
 
-def format_module_item(course_id: int, course_name: str, module: Dict[str, Any], item: Dict[str, Any]) -> Dict[str, Any]:
-    """Format a module item into a consistent structure for the frontend."""
+def module_item_weeks(module: Dict[str, Any]) -> List[Tuple[Dict[str, Any], List[int], str]]:
+    """Walk a module's items in position order, assigning each a week set and label.
+
+    Canvas teachers sometimes name a top-level module by chapter (e.g.
+    "CHƯƠNG 8: Sự hô hấp...") rather than by week. In that structure the actual
+    week numbers live in "Context Module Sub Header" items (type "SubHeader")
+    that precede groups of real items inside the module.
+
+    This helper yields each item (including SubHeader items, for module
+    classification) paired with the week numbers parsed from the most recent
+    preceding SubHeader and the display label (the SubHeader title). Items
+    before any SubHeader fall back to the top-level module name; if that also
+    has no week info they get week [0] (uncategorized).
+
+    Returns a list of (item, weeks, label) tuples in position order.
+    """
+    items = module.get("items") or []
+    # Ensure a deterministic order independent of API ordering.
+    ordered = sorted(items, key=lambda it: it.get("position", 0))
+
+    # Start with the top-level module name so items before any SubHeader still
+    # get assigned (items with no resolvable week default to [0] / uncategorized).
+    label = module.get("name", "Unnamed Module")
+    weeks = extract_weeks(module.get("name"))
+
+    result: List[Tuple[Dict[str, Any], List[int], str]] = []
+    for item in ordered:
+        if item.get("type") == "SubHeader":
+            sub_title = item.get("title", "")
+            if sub_title:
+                label = sub_title
+            sub_weeks = extract_weeks(sub_title)
+            # A sub-header without week info (e.g. "[Nội dung bài học]" or
+            # "Luyện tập") is a grouping header, not a week boundary — keep the
+            # previously parsed weeks so trailing items stay in the right week.
+            if sub_weeks:
+                weeks = sub_weeks
+            result.append((item, weeks, label))
+            continue
+
+        result.append((item, (weeks if weeks else [0]), label))
+
+    return result
+
+
+def format_module_item(course_id: int, course_name: str, module: Dict[str, Any], item: Dict[str, Any], module_label: Optional[str] = None) -> Dict[str, Any]:
+    """Format a module item into a consistent structure for the frontend.
+
+    Args:
+        module_label: The display label for the item's group. Defaults to the
+            top-level module name; callers should pass the nearest SubHeader
+            title when one applies (see module_item_weeks).
+    """
     is_completed, has_tracking = get_item_completion(item)
 
     return {
         "course_id": course_id,
         "course_name": course_name,
-        "module": module.get("name", "Unnamed Module"),
+        "module": module_label or module.get("name", "Unnamed Module"),
         "title": item.get("title", "Untitled"),
         "type": item.get("type", "Unknown"),
         "completed": is_completed,
@@ -768,12 +830,16 @@ def get_week_items(
         if not module_items:
             continue
 
-        for item in module_items:
+        for item, item_weeks, item_label in module_item_weeks(module):
             if item.get("type") not in ALLOWED_ITEM_TYPES:
+                continue
+            # Only include items that actually belong to the requested week.
+            # For week 0, item_weeks is already [0] for unresolvable items.
+            if week not in item_weeks:
                 continue
             if unfinished_only and not is_incomplete(item):
                 continue
-            items.append(format_module_item(course_id, course_name, module, item))
+            items.append(format_module_item(course_id, course_name, module, item, module_label=item_label))
 
     logger.info(f"Found {len(items)} items for course {course_id}, week {week}")
     return items, course_name, None
@@ -790,12 +856,13 @@ def get_all_course_items(
     
     This is the workhorse for the overview endpoint. It:
     1. Fetches all modules with embedded items in ONE API call
-    2. Groups items by the week numbers extracted from module names
-    
+    2. Groups items by the week numbers resolved per-item via module_item_weeks()
+       (which considers SubHeader week info and falls back to the module name)
+
     Returns:
         Tuple of (week_groups, error_response) where week_groups is a dict
         mapping week number -> list of formatted items.
-        Module items without week info are grouped under week 0 (General).
+        Items that cannot be resolved to a week are grouped under week 0 (General).
     """
     modules, response = get_course_modules(course_id, headers, include_items=True)
     if response is not None:
@@ -806,18 +873,16 @@ def get_all_course_items(
     # Group items by week directly from the modules-with-items response
     week_groups: Dict[int, List[Dict]] = {}
     for module in modules:
-        weeks = extract_weeks(module.get("name"))
-        target_weeks = weeks if weeks else [0]
-        module_items = module.get("items") or []
-
-        for week in target_weeks:
-            if not (0 <= week <= 100):
+        for item, item_weeks, item_label in module_item_weeks(module):
+            if item.get("type") not in ALLOWED_ITEM_TYPES:
                 continue
-            week_groups.setdefault(week, [])
-            for item in module_items:
-                if item.get("type") not in ALLOWED_ITEM_TYPES:
+            formatted = format_module_item(course_id, course_name, module, item, module_label=item_label)
+            # An item may belong to multiple weeks (e.g. a sub-header spanning
+            # weeks 1,2) — include it in each resolved week.
+            for week in item_weeks:
+                if not (0 <= week <= 100):
                     continue
-                week_groups[week].append(format_module_item(course_id, course_name, module, item))
+                week_groups.setdefault(week, []).append(formatted)
 
     return week_groups, None
 
@@ -969,21 +1034,32 @@ def list_course_weeks(course_id: int):
     if error:
         return error
 
-    modules, response = get_course_modules(course_id, headers)
+    modules, response = get_course_modules(course_id, headers, include_items=True)
     if response is not None:
         return api_error("Failed to fetch modules", response)
 
-    # Collect all week numbers from extract_weeks (ranges already expanded)
+    # Collect all week numbers from extract_weeks (ranges already expanded).
+    # Weeks may come from the top-level module name or from SubHeader items
+    # within a chapter-named module, so we resolve them per-item.
     weeks = set()
     has_general = False
     for module in modules:
-        module_weeks = extract_weeks(module.get("name"))
-        if not module_weeks:
-            has_general = True
-        else:
-            validated_weeks = [w for w in module_weeks if 0 <= w <= 100]
-            if validated_weeks:
-                weeks.update(validated_weeks)
+        module_items = module.get("items")
+
+        if not module_items:
+            module_weeks = extract_weeks(module.get("name"))
+            if not module_weeks:
+                has_general = True
+            else:
+                weeks.update(w for w in module_weeks if 0 <= w <= 100)
+            continue
+
+        for _item, item_weeks, _label in module_item_weeks(module):
+            validated = [w for w in item_weeks if 0 <= w <= 100]
+            if not validated:
+                has_general = True
+            else:
+                weeks.update(validated)
 
     result = sorted(weeks)
     if has_general:

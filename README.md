@@ -1,33 +1,35 @@
 # VinFocus
 > "Everything from Canvas. Nothing in your way."
 
+*Development is currently paused pending official approval from Vinschool.*
+
 VinFocus is a personal information hub for Vinschool's Canvas LMS, designed for Vinschool students. It aggregates course modules and items into a cleaner interface so you can browse what exists — without trying to predict what you should do on a given day.
 
-## Demo (old, will be updated later)
+## Demo
+> This demo shows a previous version of VinFocus. It does not represent the current development status or planned public authentication flow.
 
 https://github.com/user-attachments/assets/c0bf2085-5e51-4b41-b13e-41436c0d9945
 
 ## Access
 
-The app is hosted and ready to use at:
+VinFocus is currently not publicly available while its integration with Vinschool's Canvas LMS is being reviewed.
 
-**https://vinfocus.onrender.com/**
-
-No installation or setup is required, just open the link, follow the setup wizard to generate and paste your Canvas API token, and start browsing.
+The hosted demo is kept offline during this period. Development and testing continue locally.
 
 ## Screenshots
+> Shown from the current development build. The manual token workflow is intended for local testing only and will be replaced by OAuth for public use.
 
 ### Landing Page
-![alt text](static/images/landing.png)
+![VinFocus Landing Page](static/images/landing.png)
 
 ### Setup Wizard
-![alt text](static/images/setup-wizard.png)
+![VinFocus Setup Wizard](static/images/setup-wizard.png)
 
 ### Work View
-![alt text](static/images/work-view.png)
+![VinFocus Work View](static/images/work-view.png)
 
 ### Timetable
-![alt text](static/images/timetable.png)
+![VinFocus timetable](static/images/timetable.png)
 
 ## Why I Built This
 
@@ -129,13 +131,13 @@ VinFocus doesn't replace Canvas. It reorganizes the same information into a fast
 
 ## API Endpoints
 
-### Course-aware routes (current)
+### Course-aware routes (development)
 
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/courses` | Active courses for the authenticated user. Returns `{ course_count, courses: [{ id, name, course_code }] }`. |
-| `GET /api/courses/<course_id>/weeks` | Week numbers found in module names. Week `0` is included if any modules have no week information. Returns `{ course_id, week_count, weeks: [int] }`. |
-| `GET /api/courses/<course_id>/week/<week>` | Quizzes, assignments, and files for a week. Returns `{ course_id, course_name, week, item_count, items: [...] }`. |
+| `GET /api/courses/<course_id>/weeks` | Week numbers found in module names and `Context Module Sub Header` items. Week `0` is included if any items have no week information. Returns `{ course_id, week_count, weeks: [int] }`. |
+| `GET /api/courses/<course_id>/week/<week>` | Quizzes, assignments, files, and pages for a week. Returns `{ course_id, course_name, week, item_count, items: [...] }`. |
 | `GET /api/courses/<course_id>/week/<week>/unfinished` | Same items, filtered to incomplete Canvas work. Same response shape. |
 | `GET /api/courses/<course_id>/overview` | Overview data for a course: all weeks with item counts, completion stats (done/unfinished/unknown), type breakdowns, and uncategorized warning count. Returns `{ course_id, course_name, week_count, weeks: [...], totals: { total, done, unfinished, unknown }, uncategorized_unfinished_count: int }`. |
 
@@ -194,7 +196,7 @@ Allowed item types: `Quiz`, `Assignment`, `File`, `Page`.
 
 ## How It Works
 
-The Flask server in `main.py` proxies Canvas API requests. When you open the app for the first time, a setup wizard guides you through generating and pasting your Canvas API token. The token is sent with every request via the `Authorization` header, so no environment variable is needed for end users.
+The Flask server in `main.py` proxies Canvas API requests. The current development build uses a setup wizard for manually generated Canvas API tokens during local testing. The public release is planned to use Canvas OAuth instead.
 
 The frontend loads courses, lets you pick a course and week, and renders items grouped by type. The timetable is stored locally in the browser's `localStorage` and is fully editable. The app also includes an overview sidebar with semester progress, week cards, and completion stats.
 
@@ -202,9 +204,12 @@ A service worker (`static/sw.js`) provides offline support with network-first AP
 
 ## Security
 
+> **Authentication status:** The current development build uses manually generated Canvas API tokens for testing. This workflow is not intended for public, multi-user deployment. Public access is paused while OAuth-based authentication and the required institutional approval are being addressed.
+
 - Tokens are stored only in browser localStorage (or sessionStorage if consent is declined)
 - Tokens are never stored on VinFocus servers
-- Tokens are only sent to Canvas-authenticated endpoints
+- Tokens are sent to VinFocus only as needed for authenticated Canvas API requests
+- Tokens are forwarded to Canvas for API authentication and are not stored server-side
 - Users can revoke tokens at any time from Canvas
 - Feedback submission (`POST /api/feedback`) requires a CSRF token obtained from `GET /api/csrf-token`
 - Feedback admin access requires an `X-Admin-Key` header with constant-time comparison
@@ -220,7 +225,8 @@ A service worker (`static/sw.js`) provides offline support with network-first AP
 - **Concurrency** — Module items are fetched using `get_course_modules(include_items=True)` to fetch all items in a single API call, eliminating N+1 requests.
 - **Rate limiting** — Token bucket algorithm per IP address. General endpoints: 300 requests per 60-second window. Token validation: 5 requests per 60-second window. Feedback submission: 10 requests per minute.
 - **Logging** — Structured logging with timestamps, log levels, and module names. IP addresses are redacted.
-- **Week parsing** — A custom parser extracts week numbers from module names. Supports Vietnamese (`tuần`, `tuân`, `tuan`) and English (`week`) keywords, ranges (`-`, `–`), lists (`+`, `&`, `,`, `/`, `=`), and mixed formats. Uses `functools.lru_cache` (maxsize=256) for caching parsed results.
+- **Week parsing** — A custom parser extracts week numbers from module names and `Context Module Sub Header` items. Supports Vietnamese (`tuần`, `tuân`, `tuan`) and English (`week`) keywords, ranges (`-`, `–`), lists (`+`, `&`, `,`, `/`, `=`), and mixed formats. Uses `functools.lru_cache` (maxsize=256) for caching parsed results.
+- **SubHeader week inheritance** — Some teachers name top-level modules by chapter (e.g. `CHƯƠNG 8: Sự hô hấp...`) instead of by week, placing the actual week numbers in "Context Module Sub Header" items inside the module. `module_item_weeks()` walks each module's items in position order, assigns each item the weeks of the nearest preceding sub-header, and falls back to the top-level module name (then week 0) for items before the first sub-header. Sub-headers without week info (e.g. `[Nội dung bài học]`, `Luyện tập`) are treated as grouping headers that inherit the previous weeks. The weeks endpoint, per-week endpoint, unfinished endpoint, and overview endpoint all resolve weeks per-item so chapter-named modules are no longer dumped wholesale into "Unassigned Modules".
 - **Course code parsing** — Course codes like `THCS.OP-MATHS-TEACHER` are parsed to extract subject keys for labeling and filtering.
 - **CSRF protection** — Server-generated tokens with 1-hour expiry, validated on POST endpoints. Stale tokens are cleaned up periodically.
 - **Database** — PostgreSQL connection pool (min 2, max 20 connections) for feedback storage.
@@ -228,7 +234,9 @@ A service worker (`static/sw.js`) provides offline support with network-first AP
 
 ## Running Locally
 
-If you prefer to run the app on your own machine instead of using the hosted version:
+VinFocus can currently be run locally for development and testing.
+
+> **Note:** The current local build uses manual Canvas API tokens for testing. This is not the intended authentication flow for a public multi-user release.
 
 1. Install dependencies:
 
@@ -245,10 +253,8 @@ python main.py
 ```
 
 3. Open `http://127.0.0.1:5000` in your browser.
-
-4. On first launch, a setup wizard will appear. Follow the 7-step guide to generate and paste your Canvas API token. The token is stored in your browser and sent with each request — no server-side setup required.
  
-> **Note:** Each token lasts up to 4 months. You'll need to repeat the setup about 2-3 times per school year. The app will warn you a week before the token expires.
+> **Note:** Each Canvas API token lasts up to 4 months. You'll need to repeat the setup about 2–3 times per school year. The app will warn you a week before the token expires. This applies to the current manual-token development workflow.
 
 ## Running Tests
 
@@ -260,7 +266,8 @@ The test suite covers:
 
 - **Unit tests** for the `extract_weeks()` parser (single weeks, ranges, multi-week lists, edge cases, non-week modules).
 - **Unit tests** for `get_item_completion()` and `format_module_item()` (three-state completion: done, unfinished, unknown).
-- **Integration tests** for all API endpoints (success, missing token, API failure, week 0/general, range expansion, legacy routes, overview endpoint, three-state completion, feedback endpoints).
+- **Unit tests** for `module_item_weeks()` (sub-header week inheritance, grouping headers without week info, multi-week sub-headers, items before the first sub-header, normal week-named modules).
+- **Integration tests** for all API endpoints (success, missing token, API failure, week 0/general, range expansion, legacy routes, overview endpoint, three-state completion, chapter-named modules with week-bearing sub-headers, feedback endpoints).
 
 Additionally, `tests/test_fixes.py` is a standalone verification script that can be run directly:
 
@@ -272,7 +279,7 @@ python tests/test_fixes.py
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `API_TOKEN` | — | Canvas API token (optional — can be set via the UI wizard instead) |
+| `API_TOKEN` | — | Optional Canvas API token for local development/testing |
 | `DATABASE_URL` | — | PostgreSQL database URL (for feedback feature) |
 | `ADMIN_API_KEY` | — | Secret key for accessing feedback data. On Render, this is auto-generated. |
 | `FLASK_DEBUG` | `"false"` | Enable Flask debug mode |
@@ -280,16 +287,12 @@ python tests/test_fixes.py
 
 ## Deployment
 
-The app is configured for deployment on Render using `render.yaml`. Key settings:
+VinFocus was previously deployed on Render.
 
-- **Build**: `pip install -r requirements.txt`
-- **Start**: `gunicorn main:app --bind 0.0.0.0:$PORT --workers 4 --timeout 120`
-- **Plan**: Free tier
-- **Health check**: `/health`
-- **Database**: Free PostgreSQL database (`vinfocus_feedback`)
-- **Auto-deploy**: Enabled
+Public deployment is currently paused pending official approval from Vinschool
+and changes to the Canvas authentication flow.
 
-## Accessing Feedback Data
+<!-- ## Accessing Feedback Data
 
 The feedback endpoint is protected and requires an admin API key for security. To view feedback submissions:
 
@@ -330,18 +333,21 @@ Then access feedback with:
 curl -H "X-Admin-Key: your-secret-key-here" http://127.0.0.1:5000/api/feedback
 ```
 
-**Note:** Never commit your `ADMIN_API_KEY` to version control. On Render, it's automatically generated and stored securely in the environment variables.
+**Note:** Never commit your `ADMIN_API_KEY` to version control. On Render, it's automatically generated and stored securely in the environment variables. -->
 
 ## Future Plans
 
-- Automatic timetable import from VSC Timetable (currently only linked via the "Open timetable" button)
+- OAuth-based Canvas authentication for public multi-user access, pending institutional approval and developer-key setup
+- Automatic timetable import from VSC Timetable (made a demo but requires permission from Vinschool's IT to continue)
 - Cross-course global search (Experimental)
 - Redesign Settings' UI
 - Split view mode (Experimental)
 
 ## Notes
 
-This project needs a valid Canvas API token to load real data. Keep the token private and do not commit it to the repository.
+VinFocus currently uses manually generated Canvas API tokens for local development and testing.
+
+Never commit Canvas credentials or tokens to the repository.
 
 ## License
 

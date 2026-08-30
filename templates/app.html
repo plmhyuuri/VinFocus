@@ -336,6 +336,9 @@
                         <button id="timetable_edit_btn" type="button" class="timetable_edit_btn" aria-label="Edit timetable" title="Edit timetable">
                             <img src="/static/images/edit_icon.png" alt="" class="edit_icon">
                         </button>
+                        <button id="timetable_example_btn" type="button" class="timetable_example_btn" hidden>
+                            <span class="timetable_example_btn_text" id="timetable_example_btn_text">Load Example Schedule</span>
+                        </button>
                         <a id="timetable_open_btn" class="timetable_open_btn" href="https://lms.vinschool.edu.vn/accounts/1/external_tools/236?launch_type=global_navigation&amp;toolId=vsc-timetable-236" target="_blank" rel="noopener noreferrer">
                             <span class="timetable_open_btn_text">Open timetable</span>
                             <span class="timetable_open_btn_arrow" aria-hidden="true">↗</span>
@@ -349,6 +352,8 @@
                 </div>
 
                 <div id="timetable_indicators" class="indicator_container"></div>
+
+                <div id="timetable_empty_hint" class="timetable_empty_hint" hidden></div>
 
                 <div id="timetable_grid" class="timetable_grid" aria-label="Weekly timetable"></div>
                 <div id="timetable_mobile" class="timetable_mobile" aria-label="Weekly timetable by day"></div>
