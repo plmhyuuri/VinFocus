@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from functools import lru_cache
 
 import requests
-from flask import Flask, jsonify, make_response, request, send_from_directory, render_template
+from flask import Flask, jsonify, make_response, request, send_from_directory, render_template, session, redirect, url_for
 from flask_cors import CORS
 
 from flask_talisman import Talisman
@@ -22,6 +22,9 @@ from psycopg2.extras import RealDictCursor
 from psycopg2.pool import SimpleConnectionPool
 
 from dotenv import load_dotenv
+
+from oauth import init_oauth, validate_canvas_token, is_oauth_configured, get_oauth_error_message
+from session_store import init_session_store, get_session, update_session_tokens, delete_session
 
 load_dotenv()
 
@@ -94,6 +97,36 @@ class Config:
 
 # Apply configuration
 app.config["DEBUG"] = Config.DEBUG
+
+# Session configuration for OAuth (server-side sessions via DB)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", secrets.token_hex(32))
+app.config["SESSION_COOKIE_SECURE"] = not Config.DEBUG
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_PERMANENT"] = False
+
+# Canvas OAuth config
+app.config["CANVAS_CLIENT_ID"] = os.getenv("CANVAS_CLIENT_ID")
+app.config["CANVAS_CLIENT_SECRET"] = os.getenv("CANVAS_CLIENT_SECRET")
+app.config["CANVAS_BASE_URL"] = os.getenv("CANVAS_BASE_URL", "https://lms.vinschool.edu.vn")
+
+# Initialize OAuth client
+init_oauth(app)
+
+# Initialize session store for OAuth tokens
+init_session_store()
+
+# Limit request body size to 1MB
+app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024
+
+# Configure CORS for frontend access
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["https://vinfocus.onrender.com", "http://localhost:5000"],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token"]
+    }
+})
 
 ALLOWED_ITEM_TYPES = frozenset({"Quiz", "Assignment", "File", "Page"})
 
@@ -289,26 +322,37 @@ def token_hash(headers: Dict[str, str]) -> str:
 
 def get_canvas_headers() -> Optional[Dict[str, str]]:
     """Get Canvas API headers.
-    
+
     Priority:
-    1. Authorization header from the incoming request (frontend-sent token)
-    2. API_TOKEN environment variable (legacy/fallback)
-    
+    1. OAuth server-side session (encrypted tokens in DB)
+    2. Authorization header from the incoming request (frontend-sent PAT)
+    3. API_TOKEN environment variable (legacy/fallback)
+
     Returns:
         Headers dict or None if no token available
     """
-    # Check if the incoming request has an Authorization header
+    # Priority 1: OAuth session
+    session_id = session.get("session_id")
+    if session_id:
+        stored = get_session(session_id)
+        if stored:
+            return {"Authorization": f"Bearer {stored['access_token']}"}
+        else:
+            # Session expired or invalid, clear it
+            session.clear()
+
+    # Priority 2: Authorization header from frontend (legacy PAT)
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header[7:]  # Strip "Bearer "
         if token:
             return {"Authorization": f"Bearer {token}"}
-    
-    # Fallback: environment variable
+
+    # Priority 3: Environment variable (legacy fallback)
     token = os.getenv("API_TOKEN")
     if token:
         return {"Authorization": f"Bearer {token}"}
-    
+
     return None
 
 
@@ -926,13 +970,13 @@ def rate_limit(max_tokens: int = None, window: int = None):
 @rate_limit(max_tokens=Config.RATE_LIMIT_VALIDATE_TOKENS, window=Config.RATE_LIMIT_WINDOW)
 def validate_token():
     """Validate a Canvas API token by making a test call to the Canvas API.
-    
+
     Expects JSON body: { "token": "..." }
     Requires X-CSRF-Token header for CSRF protection.
     Returns: { "valid": true/false, "message": "..." }
     The token is used only for this validation request and is never stored
     server-side. The frontend is responsible for persisting it in localStorage.
-    
+
     Rate limited: 5 requests per minute per IP.
     """
     # Validate CSRF token
@@ -943,47 +987,22 @@ def validate_token():
     data = request.get_json(silent=True)
     if not data or not data.get("token"):
         return jsonify({"valid": False, "message": "No token provided."}), 400
-    
+
     token = data["token"].strip()
     if not token:
         return jsonify({"valid": False, "message": "Token is empty."}), 400
-    
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    # Try fetching courses to see if the token works. The token is used only
-    # for this single request and is discarded immediately afterward.
-    try:
-        response = requests.get(
-            f"{Config.LMS_BASE_URL}/api/v1/courses",
-            headers=headers,
-            params={"per_page": 1},
-            timeout=Config.REQUEST_TIMEOUT,
-        )
-        
-        if response.status_code == 200:
-            return jsonify({
-                "valid": True,
-                "message": "Token is valid.",
-            })
-        elif response.status_code == 401:
-            return jsonify({
-                "valid": False,
-                "message": "Token is invalid or expired. Please check your token and try again.",
-            })
-        else:
-            return jsonify({
-                "valid": False,
-                "message": f"Canvas API returned status {response.status_code}. Please try again later.",
-            })
-    except requests.exceptions.Timeout:
+
+    # Use shared validation function (validates against /api/v1/users/self)
+    valid, user_info = validate_canvas_token(token)
+    if valid:
         return jsonify({
-            "valid": False,
-            "message": "Connection timed out. Please check your internet connection.",
+            "valid": True,
+            "message": "Token is valid.",
         })
-    except requests.exceptions.RequestException:
+    else:
         return jsonify({
             "valid": False,
-            "message": "Connection error. Please check your internet connection.",
+            "message": "Token is invalid or expired. Please check your token and try again.",
         })
 
 
@@ -991,12 +1010,174 @@ def validate_token():
 @rate_limit()
 def get_csrf_token():
     """Get a CSRF token for POST endpoints.
-    
+
     The frontend should include this token in the X-CSRF-Token header
     when making POST requests to /api/validate-token or /api/feedback.
     """
     token = generate_csrf_token()
     return jsonify({"csrf_token": token})
+
+
+# ─── OAuth Routes ──────────────────────────────────────────────
+
+
+@app.get("/auth/config")
+@rate_limit()
+def auth_config():
+    """Return OAuth configuration status for frontend."""
+    return jsonify({
+        "oauth_enabled": is_oauth_configured(),
+    })
+
+
+@app.get("/auth/canvas")
+@rate_limit(max_tokens=10, window=60)
+def canvas_login():
+    """Initiate OAuth flow - redirect to Canvas authorization."""
+    if not is_oauth_configured():
+        return jsonify({"error": "OAuth not configured"}), 503
+
+    canvas = app.canvas
+    code_verifier = secrets.token_urlsafe(64)
+    state = secrets.token_urlsafe(32)
+
+    session["oauth_pkce"] = {"verifier": code_verifier, "state": state}
+
+    redirect_uri = url_for("canvas_callback", _external=True)
+    return canvas.authorize_redirect(
+        redirect_uri,
+        state=state,
+        code_verifier=code_verifier,
+        code_challenge_method="S256",
+    )
+
+
+@app.get("/auth/canvas/callback")
+def canvas_callback():
+    """Handle Canvas OAuth callback."""
+    if not is_oauth_configured():
+        return jsonify({"error": "OAuth not configured"}), 503
+
+    canvas = app.canvas
+
+    # Verify state parameter (CSRF protection)
+    state = request.args.get("state")
+    stored_pkce = session.pop("oauth_pkce", None)
+    if not stored_pkce or state != stored_pkce.get("state"):
+        logger.warning("OAuth callback: invalid state parameter")
+        return redirect(url_for("app_page", oauth_error="invalid_request"))
+
+    code = request.args.get("code")
+    error = request.args.get("error")
+    error_description = request.args.get("error_description")
+
+    if error:
+        logger.error(f"OAuth error: {error} - {error_description}")
+        safe_msg = get_oauth_error_message(error)
+        return redirect(url_for("app_page", oauth_error=error))
+
+    if not code:
+        logger.warning("OAuth callback: missing authorization code")
+        return redirect(url_for("app_page", oauth_error="invalid_request"))
+
+    code_verifier = stored_pkce.get("verifier")
+    if not code_verifier:
+        logger.warning("OAuth callback: missing PKCE verifier")
+        return redirect(url_for("app_page", oauth_error="invalid_request"))
+
+    # Exchange code for tokens
+    from oauth import exchange_code_for_tokens
+    token_data = exchange_code_for_tokens(code, code_verifier)
+    if not token_data:
+        logger.error("OAuth callback: token exchange failed")
+        return redirect(url_for("app_page", oauth_error="server_error"))
+
+    # Validate token and get user info
+    valid, user_info = validate_canvas_token(token_data["access_token"])
+    if not valid or not user_info:
+        logger.error("OAuth callback: token validation failed")
+        return redirect(url_for("app_page", oauth_error="server_error"))
+
+    # Store session in DB
+    try:
+        session_id = create_session(
+            canvas_user_id=str(user_info.get("id", "")),
+            canvas_user_name=user_info.get("name", "Unknown"),
+            access_token=token_data["access_token"],
+            refresh_token=token_data.get("refresh_token"),
+            expires_in=token_data["expires_in"],
+            scope=token_data["scope"],
+        )
+        session["session_id"] = session_id
+        logger.info(f"OAuth login successful for user {user_info.get('id')}")
+    except Exception as e:
+        logger.error(f"OAuth callback: failed to create session: {e}")
+        return redirect(url_for("app_page", oauth_error="server_error"))
+
+    return redirect(url_for("app_page", oauth_success="1"))
+
+
+@app.get("/auth/status")
+@rate_limit()
+def auth_status():
+    """Check if user has valid OAuth session."""
+    session_id = session.get("session_id")
+    if not session_id:
+        return jsonify({"authenticated": False})
+
+    stored = get_session(session_id)
+    if not stored:
+        session.clear()
+        return jsonify({"authenticated": False})
+
+    # Auto-refresh if near expiry (within 60 seconds)
+    import time
+    expires_ts = stored["token_expires_at"].timestamp()
+    if time.time() >= expires_ts - 60:
+        if stored.get("refresh_token"):
+            from oauth import refresh_access_token
+            new_tokens = refresh_access_token(stored["refresh_token"])
+            if new_tokens:
+                updated = update_session_tokens(
+                    session_id,
+                    new_tokens["access_token"],
+                    new_tokens.get("refresh_token"),
+                    new_tokens["expires_in"],
+                )
+                if updated:
+                    stored = get_session(session_id)
+                else:
+                    delete_session(session_id)
+                    session.clear()
+                    return jsonify({"authenticated": False})
+            else:
+                delete_session(session_id)
+                session.clear()
+                return jsonify({"authenticated": False})
+        else:
+            delete_session(session_id)
+            session.clear()
+            return jsonify({"authenticated": False})
+
+    return jsonify({
+        "authenticated": True,
+        "user": {
+            "id": stored["canvas_user_id"],
+            "name": stored["canvas_user_name"],
+        },
+        "auth_method": "oauth",
+    })
+
+
+@app.post("/auth/logout")
+@rate_limit()
+def logout():
+    """Logout - delete server-side session."""
+    session_id = session.get("session_id")
+    if session_id:
+        delete_session(session_id)
+    session.clear()
+    return jsonify({"success": True})
 
 
 # ─── API Routes ────────────────────────────────────────────────
@@ -1544,9 +1725,14 @@ init_db()
 # Log rate limiter configuration
 logger.info(f"Rate limiting configured: {Config.RATE_LIMIT_TOKENS} requests per {Config.RATE_LIMIT_WINDOW}s per IP")
 
-# Initial cleanup of stale rate limit and CSRF state
+# Initial cleanup of stale rate limit, CSRF state, and expired sessions
 cleanup_rate_limit_state()
 cleanup_csrf_tokens()
+try:
+    from session_store import cleanup_expired_sessions
+    cleanup_expired_sessions()
+except Exception as e:
+    logger.warning(f"Initial session cleanup failed: {e}")
 
 # Start background cleanup thread
 _cleanup_thread_started = False
@@ -1556,16 +1742,21 @@ def _start_cleanup_thread():
     if _cleanup_thread_started:
         return
     _cleanup_thread_started = True
-    
+
     def cleanup_loop():
         while True:
             time.sleep(300)  # Every 5 minutes
             cleanup_rate_limit_state()
             cleanup_csrf_tokens()
-    
+            try:
+                from session_store import cleanup_expired_sessions
+                cleanup_expired_sessions()
+            except Exception:
+                pass
+
     thread = threading.Thread(target=cleanup_loop, daemon=True)
     thread.start()
-    logger.info("Started background cleanup thread for rate limit and CSRF state")
+    logger.info("Started background cleanup thread for rate limit, CSRF, and session state")
 
 _start_cleanup_thread()
 

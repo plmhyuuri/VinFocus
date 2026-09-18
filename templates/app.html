@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://vinfocus.onrender.com; connect-src 'self'; font-src 'self'; frame-src 'none'; object-src 'none'">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://vinfocus.onrender.com; connect-src 'self' https://lms.vinschool.edu.vn; font-src 'self'; frame-src 'none'; object-src 'none'">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description" content="VinFocus - A personal information hub for Vinschool's Canvas LMS. Browse courses, weeks, and resources in a cleaner interface.">
         <meta name="theme-color" content="#0d0d0d">
@@ -464,20 +464,6 @@
             </div>
         </div>
 
-        <!-- Token Settings Modal (hidden, used as template) -->
-        <div id="token_settings_modal" role="dialog" aria-modal="true" tabindex="-1" hidden>
-            <div class="token_settings_content">
-                <h2 id="token_settings_title"></h2>
-                <p class="token_settings_info" id="token_settings_info"></p>
-                <div class="setup_token_group">
-                    <input type="text" id="settings_token_input" class="setup_token_input" placeholder="" autocomplete="off" spellcheck="false">
-                    <button type="button" class="setup_validate_btn" id="settings_validate_btn"></button>
-                </div>
-                <p class="setup_message" id="settings_token_message" hidden></p>
-                <button type="button" class="setup_skip_btn" id="settings_need_token_btn"></button>
-            </div>
-        </div>
-
         <!-- Feedback Modal (hidden, used as template) -->
         <div id="feedback_modal" role="dialog" aria-modal="true" tabindex="-1" hidden>
             <div class="token_settings_content feedback_form">
@@ -490,25 +476,22 @@
                 <div class="feedback_radio_group" id="feedback_recommend_group"></div>
                 <p class="feedback_question" id="feedback_improve_label"></p>
                 <textarea class="feedback_textarea" id="feedback_improve_textarea" rows="3"></textarea>
-                <p class="setup_message" id="feedback_message" hidden></p>
-                <button type="button" class="setup_validate_btn" id="feedback_submit_btn" style="width: 100%; margin-top: 8px;"></button>
+                <p class="intro_message" id="feedback_message" hidden></p>
+                <button type="button" class="intro_validate_btn" id="feedback_submit_btn" style="width: 100%; margin-top: 8px;"></button>
             </div>
         </div>
 
         <!-- Setup Overlay (first-run wizard) -->
-        <div id="setup_overlay" class="setup_overlay" hidden>
-            <div class="setup_card">
-                <div class="setup_header">
-                    <h1 class="setup_title" id="setup_title"></h1>
-                    <p class="setup_subtitle" id="setup_subtitle"></p>
-                    <button type="button" id="setup_close_btn" class="setup_close_btn" aria-label="Close setup wizard">✕</button>
+        <div id="intro_overlay" class="intro_overlay" hidden>
+            <div class="intro_card">
+                <div class="intro_header">
+                    <h1 class="intro_title" id="intro_title"></h1>
+                    <p class="intro_subtitle" id="intro_subtitle"></p>
+                    <button type="button" id="intro_close_btn" class="intro_close_btn" aria-label="Close intro wizard">✕</button>
                 </div>
-                <div id="setup_warning" class="setup_warning" hidden></div>
-                <div id="setup_content" class="setup_content">
+                <div id="intro_warning" class="intro_warning" hidden></div>
+                <div id="intro_content" class="intro_content">
                     <!-- Dynamically rendered by script.js -->
-                </div>
-                <div class="setup_footer">
-                    <button type="button" id="setup_skip_btn" class="setup_skip_btn"></button>
                 </div>
             </div>
         </div>

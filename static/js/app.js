@@ -1,12 +1,21 @@
-const itemList = document.getElementById("item_list");
+let itemList = document.getElementById("item_list");
 const searchInput = document.getElementById("search_input");
 const coursePills = document.getElementById("course_pills");
 const unfinishedOnly = document.getElementById("unfinished_only");
 const unknownOnly = document.getElementById("unknown_only");
 const hubTitle = document.getElementById("hub_title");
-const prevWeekBtn = document.getElementById("prev_week");
-const nextWeekBtn = document.getElementById("next_week");
-const weekInput = document.getElementById("week_input");
+let prevWeekBtn = document.getElementById("prev_week");
+let nextWeekBtn = document.getElementById("next_week");
+let weekInput = document.getElementById("week_input");
+
+// Panel B DOM references (populated by enableSplitView)
+let itemListB = null;
+let prevWeekBtnB = null;
+let nextWeekBtnB = null;
+let weekInputB = null;
+// Shared per-column mini-header DOM for the active column's course label
+let activeColumnHeaderB = null;
+let activeColumnHeaderA = null;
 const viewTabs = document.querySelectorAll(".view_tab");
 const themeToggle = document.getElementById("theme_toggle");
 const workView = document.getElementById("work_view");
@@ -248,13 +257,13 @@ const TRANSLATIONS = {
     open_ebook_library: "Open E-Book Library",
     ebook_modal_title: "E-Book Library",
     ebook_modal_close: "Close",
-    offlineBanner: "Offline — showing cached data.",
+    offlineBanner: "Offline - showing cached data.",
     week: "Week",
     general: "Unassigned Modules",
     searchPlaceholder: "Search items",
     unfinishedLabel: "Unfinished",
     unknownLabel: "Unknown",
-    tagline: "Canvas information hub — browse courses, weeks, and resources.",
+    tagline: "Canvas information hub - browse courses, weeks, and resources.",
     timetableTitle: "Weekly Timetable",
     timetableNote: "Manual schedule stored locally in this app.",
     openTimetable: "Open timetable",
@@ -273,53 +282,49 @@ const TRANSLATIONS = {
     breaktime: "Breaktime",
     lunchBreak: "Lunch Break",
     notInClass: "End of the school day",
-    setupTitle: "Welcome to VinFocus",
-    setupSubtitle: "Set up your Canvas API token to get started.",
-    setupStep: "Step",
-    setupOf: "of",
-    setupNext: "Next",
-    setupPrev: "Back",
-    setupFinish: "Finish",
-    setupSkip: "I already have a token",
-    setupCloseWarning: "You haven't set up a Canvas API token yet, so the app can't load your course data. If you want to set up the token later, open Settings (the gear icon) and choose API Token Settings.",
-    setupTokenLabel: "Paste your API token here",
-    setupTokenPlaceholder: "Paste API token…",
-    setupValidate: "Validate & Save",
-    setupValidating: "Validating...",
-    setupSuccess: "Token saved successfully!",
-    setupError: "Invalid token. Please check and try again.",
-    setupTokenHelp: "Don't have a token yet? Follow the steps below.",
-    setupSecurityTitle: "⚠️ Security Notice",
-    setupSecurityDesc: "",
-    setupStep1Title: "Log in to Vinschool Canvas",
-    setupStep1Desc: "Go to lms.vinschool.edu.vn and log in with your school account.",
-    setupStep2Title: "Open Account Settings",
-    setupStep2Desc: 'Click the "Tài Khoản" (Account) button at the top-left corner, then select "Cài Đặt" (Settings).',
-    setupStep3Title: "Find Approved Integrations",
-    setupStep3Desc: 'Scroll down to the "Tích Hợp Được Phê Duyệt" (Approved Integrations) section.',
-    setupStep4Title: "Create a New Access Token",
-    setupStep4Desc: 'Click the "Thẻ Truy Cập Mới" (New Access Token) button.',
-    setupStep5Title: "Fill in Token Details",
-    setupStep5Desc: 'Set "Mục Đích" (Purpose) to "VinFocus" and select the latest possible date for "Ngày Hết Hạn" (Expiration Date).',
-    setupStep5Note: "Each token lasts up to 4 months. You'll need to repeat this process about 2-3 times per school year.",
-    setupStep6Title: "Copy and Paste Your Token",
-    setupStep6Desc: "Copy the generated API key and paste it into the field at the final step.",
-    setupStep6Note: "Save it somewhere safe. It can only be viewed once.",
-    setupScreenshot: "Screenshot coming soon",
+    introTitle: "Welcome to VinFocus",
+    introSubtitle: "Your dashboard for Vinschool Canvas - view courses, track modules, and stay on top of your work.",
+    introCloseWarning: "You haven't signed in yet, so the app can't load your course data. To connect later, open Settings (the gear icon) and choose Sign in to Canvas.",
+    introStep: "Step",
+    introOf: "of",
+    introNext: "Next",
+    introPrev: "Back",
+    introFinish: "Finish",
+introChooseTitle: "How would you like to connect?",
+introChooseDesc: "OAuth is recommended - it's more secure and tokens auto-refresh. Manual tokens expire every 4 months.",
+introTabOAuth: "OAuth (Recommended)",
+introTabManual: "Manual Token (Legacy)",
+introOAuthTitle: "Connect with Canvas",
+introOAuthDesc: "Click below to securely authorize VinFocus. You'll be redirected to Canvas to approve access.",
+introOAuthConnect: "Connect with Canvas",
+introOAuthUnavailable: "OAuth is not configured in this environment.",
+introManualTitle: "Use Manual Access Token",
+introManualDesc: "Paste a Personal Access Token from Canvas Settings → Approved Integrations.",
+introOAuthErrorAccessDenied: "Canvas authorization was cancelled.",
+introOAuthErrorInvalidRequest: "The Canvas authorization request was invalid.",
+introOAuthErrorServerError: "Canvas couldn't complete the authorization.",
+introOAuthErrorUnknown: "An unknown error occurred during authorization.",
+    introTokenLabel: "Paste your API token here",
+    introTokenPlaceholder: "Paste API token…",
+    introValidate: "Validate & Save",
+    introValidating: "Validating...",
+    introSuccess: "Token saved successfully!",
+    introError: "Invalid token. Please check and try again.",
+    introStep1Title: "What is VinFocus?",
+    introStep1Desc: "A cleaner, simpler view of your Vinschool Canvas - browse courses, track modules, and stay on top of everything in one place.",
+    introStep2Title: "Made for students",
+    introStep2Desc: "See weekly schedules, course resources, and your progress at a glance. No install needed - it works right in your browser.",
     tokenExpiresSoon: "Your API token will expire in {days} days.",
     tokenExpired: "Your API token has expired. Please update it.",
     tokenExpiresToday: "Your API token expires today!",
-    tokenSettings: "API Token Settings",
-    tokenUpdate: "Update Token",
-    tokenClose: "Close",
-    tokenAge: "Token age: {days} days",
-    tokenValid: "Token is active",
     footerMadeBy: "Made by Pham Le Manh Hung",
     footerFeedback: "I appreciate any reviews or feedbacks towards this project.",
     footerCopyright: "© 2026 VinFocus",
     settingsTitle: "Settings",
-    settingsApiToken: "API Token Settings",
+    settingsConnect: "Sign in to Canvas",
     settingsFeedback: "Send Feedback",
+    settingsSplitView: "Split View",
+    settingsSplitViewDesc: "Compare two courses side by side",
     subjectLabelsTitle: "Custom Subject Labels",
     subjectLabelsDesc: "Set custom labels for subject codes. These override the default names and persist across language changes. Leave a field empty to use the default.",
     subjectLabelsReset: "Reset",
@@ -365,7 +370,7 @@ const TRANSLATIONS = {
     tcSection2Title: "2. Use of API Tokens",
     tcSection2Text: "Users are responsible for keeping their API tokens secure. VinFocus stores tokens locally in your browser and does not intentionally transmit them to third parties. Never share your API token with others.",
     tcSection3Title: "3. Privacy",
-    tcSection3Text: "VinFocus may collect anonymous feedback submitted by users. Feedback may be stored and reviewed to improve the service. API tokens are not stored in the VinFocus database — they are stored only in your browser's local storage.",
+    tcSection3Text: "VinFocus may collect anonymous feedback submitted by users. Feedback may be stored and reviewed to improve the service. API tokens are not stored in the VinFocus database - they are stored only in your browser's local storage.",
     tcSection4Title: "4. No Warranty",
     tcSection4Text: "VinFocus is provided 'as is' without guarantees of availability, accuracy, or reliability. Course information displayed in VinFocus originates from Canvas and may be incomplete, outdated, or inaccurate.",
     tcSection5Title: "5. Limitation of Liability",
@@ -377,13 +382,13 @@ const TRANSLATIONS = {
     tcSection8Title: "8. Data Retention and Deletion",
     tcSection8Text: "Feedback data is retained indefinitely unless deletion is requested. To request deletion of your feedback, contact hung020121@gmail.com with the subject 'Data Deletion Request'. API tokens stored in your browser can be removed at any time by clearing your browser data or using the 'Clear Token' option in Settings.",
     tcSection9Title: "9. Data Processing",
-    tcSection9Text: "VinFocus is hosted on Render.com. Feedback data is stored in a PostgreSQL database. Your Canvas API token is NEVER sent to our servers — it remains in your browser's local storage and is only used directly from your browser to authenticate with Canvas.",
+    tcSection9Text: "VinFocus is hosted on Render.com. Feedback data is stored in a PostgreSQL database. Your Canvas API token is NEVER sent to our servers - it remains in your browser's local storage and is only used directly from your browser to authenticate with Canvas.",
     tcSection10Title: "10. Your Rights (GDPR/CCPA)",
     tcSection10Text: "You have the right to:\n- Access any personal data we hold about you\n- Request deletion of your data\n- Opt-out of data collection\n- Withdraw consent at any time\n\nTo exercise these rights, contact hung020121@gmail.com.",
-    tcApiWarning: "Your Canvas API token is like a password — keep it private.",
+    tcApiWarning: "Your Canvas API token is like a password - keep it private.",
     tcAgreeCheckbox: "I agree to the Terms and Conditions",
     tcViewTerms: "View Terms",
-    setupTcError: "Please agree to the Terms and Conditions before proceeding.",
+    introTcError: "Please agree to the Terms and Conditions before proceeding.",
     
     // Overview
     overview: "Overview",
@@ -402,6 +407,7 @@ const TRANSLATIONS = {
     overviewDrinkWater: "Go drink a glass of water. It'll get there at some point.",
     overviewTryRefresh: "If this continues, try refreshing the page.",
     overviewBadDay: "Canvas may be having a bad day. Try again later.",
+    retry: "Retry",
   },
   vi: {
     feedbackError: "Đã xảy ra lỗi. Vui lòng thử lại.",
@@ -419,7 +425,7 @@ const TRANSLATIONS = {
     tcSection2Title: "2. Sử dụng Mã API",
     tcSection2Text: "Người dùng chịu trách nhiệm giữ bảo mật mã API của họ. VinFocus lưu trữ mã cục bộ trong trình duyệt của bạn và không cố ý truyền chúng cho bên thứ ba. Không bao giờ chia sẻ mã API của bạn với người khác.",
     tcSection3Title: "3. Quyền Riêng Tư",
-    tcSection3Text: "VinFocus có thể thu thập phản hồi ẩn danh do người dùng gửi. Phản hồi có thể được lưu trữ và xem xét để cải thiện dịch vụ. Mã API không được lưu trữ trong cơ sở dữ liệu VinFocus — chúng chỉ được lưu trữ trong bộ nhớ cục bộ của trình duyệt của bạn.",
+    tcSection3Text: "VinFocus có thể thu thập phản hồi ẩn danh do người dùng gửi. Phản hồi có thể được lưu trữ và xem xét để cải thiện dịch vụ. Mã API không được lưu trữ trong cơ sở dữ liệu VinFocus - chúng chỉ được lưu trữ trong bộ nhớ cục bộ của trình duyệt của bạn.",
     tcSection4Title: "4. Không Có Bảo Hàng",
     tcSection4Text: "VinFocus được cung cấp 'như hiện tại' mà không có đảm bảo về tính sẵn sàng, độ chính xác, hoặc độ tin cậy. Thông tin khóa học hiển thị trong VinFocus có nguồn gốc từ Canvas và có thể không đầy đủ, lỗi thời, hoặc không chính xác.",
     tcSection5Title: "5. Giới Hạn Trách Nhiệm",
@@ -428,10 +434,10 @@ const TRANSLATIONS = {
     tcSection6Text: "Các tính năng có thể được sửa đổi, tạm dừng, hoặc xóa bỏ bất kỳ lúc nào mà không cần thông báo trước.",
     tcSection7Title: "7. Liên Hệ",
     tcSection7Text: "Đối với câu hỏi hoặc phản hồi về VinFocus, vui lòng sử dụng biểu mẫu phản hồi có sẵn trong ứng dụng.",
-    tcApiWarning: "Mã API Canvas của bạn giống như mật khẩu — hãy giữ bảo mật.",
+    tcApiWarning: "Mã API Canvas của bạn giống như mật khẩu - hãy giữ bảo mật.",
     tcAgreeCheckbox: "Tôi đồng ý với Điều khoản Dịch vụ",
     tcViewTerms: "Xem Điều khoản",
-    setupTcError: "Vui lòng đồng ý với Điều khoản Dịch vụ trước khi tiếp tục.",
+    introTcError: "Vui lòng đồng ý với Điều khoản Dịch vụ trước khi tiếp tục.",
     
     monday: "Thứ Hai",
     tuesday: "Thứ Ba",
@@ -496,13 +502,13 @@ const TRANSLATIONS = {
     open_ebook_library: "Mở Thư Viện Sách Điện Tử",
     ebook_modal_title: "Thư Viện Sách Điện Tử",
     ebook_modal_close: "Đóng",
-    offlineBanner: "Ngoại tuyến — đang hiển thị dữ liệu đã lưu.",
+    offlineBanner: "Ngoại tuyến - đang hiển thị dữ liệu đã lưu.",
     week: "Tuần",
     general: "Học phần chưa phân tuần",
     searchPlaceholder: "Tìm kiếm mục",
     unfinishedLabel: "Chưa Hoàn Thành",
     unknownLabel: "Chưa rõ",
-    tagline: "Trung tâm thông tin Canvas — duyệt khóa học, tuần và tài nguyên.",
+    tagline: "Trung tâm thông tin Canvas - duyệt khóa học, tuần và tài nguyên.",
     timetableTitle: "Thời Khóa Biểu Tuần",
     timetableNote: "Lịch học được lưu cục bộ trong ứng dụng này.",
     openTimetable: "Mở thời khóa biểu",
@@ -521,53 +527,49 @@ const TRANSLATIONS = {
     breaktime: "Giờ Ra Chơi",
     lunchBreak: "Nghỉ Trưa",
     notInClass: "Kết thúc ngày học",
-    setupTitle: "Chào mừng đến với VinFocus",
-    setupSubtitle: "Thiết lập mã API Canvas để bắt đầu.",
-    setupStep: "Bước",
-    setupOf: "trên",
-    setupNext: "Tiếp theo",
-    setupPrev: "Quay lại",
-    setupFinish: "Hoàn tất",
-    setupSkip: "Tôi đã có mã",
-    setupCloseWarning: "Bạn chưa thiết lập mã API Canvas, nên ứng dụng không thể tải dữ liệu khóa học của bạn. Nếu muốn thiết lập mã sau, hãy mở Cài Đặt (biểu tượng bánh răng) và chọn Cài Đặt Mã API.",
-    setupTokenLabel: "Dán mã API của bạn vào đây",
-    setupTokenPlaceholder: "Dán mã API…",
-    setupValidate: "Xác thực & Lưu",
-    setupValidating: "Đang xác thực...",
-    setupSuccess: "Đã lưu mã thành công!",
-    setupError: "Mã không hợp lệ. Vui lòng kiểm tra lại.",
-    setupTokenHelp: "Chưa có mã? Làm theo các bước dưới đây.",
-    setupSecurityTitle: "⚠️ Lưu ý Bảo Mật",
-    setupSecurityDesc: "",
-    setupStep1Title: "Đăng nhập vào Vinschool Canvas",
-    setupStep1Desc: "Truy cập lms.vinschool.edu.vn và đăng nhập bằng tài khoản trường của bạn.",
-    setupStep2Title: "Mở Cài Đặt Tài Khoản",
-    setupStep2Desc: 'Nhấn nút "Tài Khoản" ở góc trên bên trái, sau đó chọn "Cài Đặt".',
-    setupStep3Title: "Tìm Tích Hợp Được Phê Duyệt",
-    setupStep3Desc: 'Cuộn xuống phần "Tích Hợp Được Phê Duyệt".',
-    setupStep4Title: "Tạo Thẻ Truy Cập Mới",
-    setupStep4Desc: 'Nhấn nút "Thẻ Truy Cập Mới".',
-    setupStep5Title: "Điền Thông Tin Token",
-    setupStep5Desc: 'Đặt "Mục Đích" là "VinFocus" và chọn ngày xa nhất có thể cho "Ngày Hết Hạn".',
-    setupStep5Note: "Mỗi token có thời hạn tối đa 4 tháng. Bạn sẽ cần làm lại quy trình này khoảng 2-3 lần mỗi năm học.",
-    setupStep6Title: "Sao Chép và Dán Token",
-    setupStep6Desc: "Sao chép mã API được tạo và dán vào ô ở bước cuối cùng.",
-    setupStep6Note: "Hãy lưu ở nơi an toàn. Bạn chỉ có thể xem lại một lần.",
-    setupScreenshot: "Ảnh chụp màn hình sẽ được cập nhật sau",
+    introTitle: "Chào mừng đến với VinFocus",
+    introSubtitle: "Bảng điều khiển Vinschool Canvas của bạn - xem khóa học, theo dõi modules và luôn cập nhật bài vở.",
+    introCloseWarning: "Bạn chưa đăng nhập, nên ứng dụng không thể tải dữ liệu khóa học của bạn. Để kết nối sau, hãy mở Cài Đặt (biểu tượng bánh răng) và chọn Đăng nhập Canvas.",
+    introStep: "Bước",
+    introOf: "trên",
+    introNext: "Tiếp theo",
+    introPrev: "Quay lại",
+    introFinish: "Hoàn tất",
+introChooseTitle: "Bạn muốn kết nối như thế nào?",
+introChooseDesc: "OAuth được khuyến nghị - an toàn hơn và token tự động làm mới. Mã thủ công hết hạn sau 4 tháng.",
+introTabOAuth: "OAuth (Khuyến nghị)",
+introTabManual: "Mã Thủ Công (Cũ)",
+introOAuthTitle: "Kết Nối với Canvas",
+introOAuthDesc: "Nhấn bên dưới để cấp quyền an toàn cho VinFocus. Bạn sẽ được chuyển đến Canvas để phê duyệt.",
+introOAuthConnect: "Kết Nối với Canvas",
+introOAuthUnavailable: "OAuth chưa được cấu hình trong môi trường này.",
+introManualTitle: "Sử Dụng Mã Truy Cập Thủ Công",
+introManualDesc: "Dán Mã Truy Cập Cá Nhân từ Canvas Settings → Tích Hợp Được Phê Duyệt.",
+introOAuthErrorAccessDenied: "Việc cấp quyền Canvas đã bị hủy.",
+introOAuthErrorInvalidRequest: "Yêu cầu cấp quyền Canvas không hợp lệ.",
+introOAuthErrorServerError: "Canvas không thể hoàn tất việc cấp quyền.",
+introOAuthErrorUnknown: "Đã xảy ra lỗi không xác định khi cấp quyền.",
+    introTokenLabel: "Dán mã API của bạn vào đây",
+    introTokenPlaceholder: "Dán mã API…",
+    introValidate: "Xác thực & Lưu",
+    introValidating: "Đang xác thực...",
+    introSuccess: "Đã lưu mã thành công!",
+    introError: "Mã không hợp lệ. Vui lòng kiểm tra lại.",
+    introStep1Title: "VinFocus là gì?",
+    introStep1Desc: "Một góc nhìn đơn giản và rõ ràng hơn về Vinschool Canvas của bạn - duyệt khóa học, theo dõi modules và nắm rõ mọi thứ ở một nơi duy nhất.",
+    introStep2Title: "Dành cho học sinh",
+    introStep2Desc: "Xem thời khóa biểu tuần, tài nguyên khóa học và tiến độ của bạn chỉ trong nháy mắt. Không cần cài đặt - hoạt động ngay trên trình duyệt của bạn.",
     tokenExpiresSoon: "Mã API của bạn sẽ hết hạn trong {days} ngày.",
     tokenExpired: "Mã API của bạn đã hết hạn. Vui lòng cập nhật.",
     tokenExpiresToday: "Mã API của bạn hết hạn hôm nay!",
-    tokenSettings: "Cài Đặt Mã API",
-    tokenUpdate: "Cập Nhật Mã",
-    tokenClose: "Đóng",
-    tokenAge: "Tuổi mã: {days} ngày",
-    tokenValid: "Mã API đang hoạt động",
     footerMadeBy: "Được tạo bởi Phạm Lê Mạnh Hùng",
     footerFeedback: "Mình rất trân trọng mọi đánh giá và phản hồi về dự án này.",
     footerCopyright: "© 2026 VinFocus",
     settingsTitle: "Cài Đặt",
-    settingsApiToken: "Cài Đặt Mã API",
+    settingsConnect: "Đăng nhập Canvas",
     settingsFeedback: "Gửi Phản Hồi",
+    settingsSplitView: "Chia đôi màn hình",
+    settingsSplitViewDesc: "So sánh hai khóa học cạnh nhau",
     subjectLabelsTitle: "Nhãn Môn Học Tùy Chỉnh",
     subjectLabelsDesc: "Đặt nhãn tùy chỉnh cho mã môn học. Các nhãn này ghi đè tên mặc định và duy trì khi chuyển ngôn ngữ. Để trống để dùng nhãn mặc định.",
     subjectLabelsReset: "Đặt Lại",
@@ -603,7 +605,7 @@ const TRANSLATIONS = {
     tcSection8Title: "8. Lưu trữ và Xóa Dữ liệu",
     tcSection8Text: "Dữ liệu phản hồi được lưu trữ không giới hạn trừ khi có yêu cầu xóa. Để yêu cầu xóa phản hồi của bạn, liên hệ hung020121@gmail.com với chủ đề 'Yêu cầu Xóa Dữ liệu'. Mã API được lưu trong trình duyệt có thể được xóa bất cứ lúc nào bằng cách xóa dữ liệu trình duyệt hoặc sử dụng tùy chọn 'Xóa Mã' trong Cài Đặt.",
     tcSection9Title: "9. Xử lý Dữ liệu",
-    tcSection9Text: "VinFocus được lưu trữ trên Render.com. Dữ liệu phản hồi được lưu trong cơ sở dữ liệu PostgreSQL. Mã API Canvas của bạn KHÔNG BAO GIỜ được gửi đến máy chủ của chúng tôi — nó nằm trong bộ nhớ cục bộ của trình duyệt và chỉ được sử dụng trực tiếp từ trình duyệt để xác thực với Canvas.",
+    tcSection9Text: "VinFocus được lưu trữ trên Render.com. Dữ liệu phản hồi được lưu trong cơ sở dữ liệu PostgreSQL. Mã API Canvas của bạn KHÔNG BAO GIỜ được gửi đến máy chủ của chúng tôi - nó nằm trong bộ nhớ cục bộ của trình duyệt và chỉ được sử dụng trực tiếp từ trình duyệt để xác thực với Canvas.",
     tcSection10Title: "10. Quyền của Bạn (GDPR/CCPA)",
     tcSection10Text: "Bạn có quyền:\n- Truy cập mọi dữ liệu cá nhân chúng tôi lưu giữ về bạn\n- Yêu cầu xóa dữ liệu của bạn\n- Từ chối thu thập dữ liệu\n- Rút lại sự đồng thuận bất cứ lúc nào\n\nĐể thực hiện các quyền này, liên hệ hung020121@gmail.com.",
     
@@ -624,6 +626,7 @@ const TRANSLATIONS = {
     overviewDrinkWater: "Hãy đi uống một ly nước. Nó sẽ sớm xong thôi.",
     overviewTryRefresh: "Nếu tình trạng này tiếp diễn, hãy thử làm mới trang.",
     overviewBadDay: "Canvas có thể đang gặp sự cố. Hãy thử lại sau.",
+    retry: "Thử lại",
   },
 };
 
@@ -832,7 +835,7 @@ function openEbookModal() {
 
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
-  closeBtn.className = "setup_validate_btn";
+  closeBtn.className = "intro_validate_btn";
   closeBtn.style.width = "100%";
   closeBtn.textContent = t("ebook_modal_close");
   closeBtn.addEventListener("click", () => closeEbookModal(modal));
@@ -932,6 +935,443 @@ const TYPE_LABELS = {
   Page: "Pages",
 };
 
+// ── Split View Slot System ──────────────────────────────────────
+// Split view splits the item-list region into two side-by-side columns
+// (panels A and B). The course-pill bar, search box, hub title, and the
+// Unfinished/Unknown filter toggles remain SHARED (single DOM, above/beside
+// the panels). Each column keeps independent state: selected course, current
+// week, loaded items, available weeks, requested overview, and its own
+// filter state (though the filter STATE is private per column, the shared
+// toggles mirror whichever column is currently active).
+//
+// When split view is disabled, slot "a" is always active and the globals
+// point directly to its state.
+
+let activeSlot = "a";
+let splitViewEnabled = storageGet("splitView") === "true";
+let _splitViewStructured = false;
+
+// Per-slot state. These are NOT swapped via window; instead we read/write
+// them through saveSlotState/restoreSlotState against the globals below.
+const _slotState = { a: {}, b: {} };
+
+// Per-slot boolean filter state (independent even though the toggles are shared)
+function slotFilterState(slot) {
+  const s = _slotState[slot];
+  if (s.unfinished === undefined) s.unfinished = false;
+  if (s.unknown === undefined) s.unknown = false;
+  return s;
+}
+
+// Point the per-column `let` DOM refs at the given slot's elements.
+function syncActiveDomRefs() {
+  if (activeSlot === "b" && itemListB) {
+    itemList = itemListB;
+    prevWeekBtn = prevWeekBtnB;
+    nextWeekBtn = nextWeekBtnB;
+    weekInput = weekInputB;
+  } else {
+    itemList = document.getElementById("item_list");
+    prevWeekBtn = document.getElementById("prev_week");
+    nextWeekBtn = document.getElementById("next_week");
+    weekInput = document.getElementById("week_input");
+  }
+}
+
+// Mirror the active column's private filter state onto the shared toggles.
+function syncFilterCheckboxes() {
+  const s = slotFilterState(activeSlot);
+  if (unfinishedOnly) unfinishedOnly.checked = !!s.unfinished;
+  if (unknownOnly) unknownOnly.checked = !!s.unknown;
+}
+
+// Persist the (shared) checkbox states into the active column's private state.
+function commitFilterState() {
+  const s = slotFilterState(activeSlot);
+  s.unfinished = unfinishedOnly.checked;
+  s.unknown = unknownOnly.checked;
+}
+
+// Whether the current slot's cache is the "unfinished" scoped one.
+function getActiveFilterBools() {
+  const s = slotFilterState(activeSlot);
+  return { unfinished: !!s.unfinished, unknown: !!s.unknown };
+}
+
+// Save the active global state into the given slot's record.
+function saveSlotState(slot) {
+  const s = _slotState[slot];
+  s.selectedCourseId = selectedCourseId;
+  s.currentWeek = currentWeek;
+  s.availableWeeks = availableWeeks;
+  s.items = items;
+  s.overviewData = overviewData || null;
+  s.currentRequestController = currentRequestController;
+  s.currentOverviewController = currentOverviewController;
+  s.overviewLoadingMessageTimer = overviewLoadingMessageTimer;
+  s.overviewLoadStartTime = overviewLoadStartTime;
+  // Preserve filter state (already stored on the record; kept independent)
+}
+
+// Load a slot's saved state into the globals (used when switching).
+function restoreSlotState(slot) {
+  const s = _slotState[slot];
+  selectedCourseId = s.selectedCourseId !== undefined ? s.selectedCourseId : null;
+  currentWeek = s.currentWeek !== undefined ? s.currentWeek : (() => {
+    const w = Number(storageGet("selectedWeek"));
+    return Number.isFinite(w) ? w : 36;
+  })();
+  availableWeeks = s.availableWeeks !== undefined ? s.availableWeeks : [];
+  items = s.items !== undefined ? s.items : [];
+  overviewData = s.overviewData !== undefined ? s.overviewData : null;
+  currentRequestController = s.currentRequestController || null;
+  currentOverviewController = s.currentOverviewController || null;
+  overviewLoadingMessageTimer = s.overviewLoadingMessageTimer || null;
+  overviewLoadStartTime = s.overviewLoadStartTime || 0;
+  syncActiveDomRefs();
+  syncFilterCheckboxes();
+}
+
+// ── Slot Switching ──────────────────────────────────────────────
+
+function switchToSlot(newSlot) {
+  if (newSlot === activeSlot) return;
+  saveSlotState(activeSlot);
+  activeSlot = newSlot;
+  restoreSlotState(newSlot);
+  updateSplitViewActiveIndicator();
+  // Re-render the newly active column + shared chrome
+  updateColumnHeaders();
+  renderWorkView();
+  updateSidebarForSlot(newSlot);
+}
+
+// ── Split View Enable/Disable ──────────────────────────────────
+
+function updateSplitViewActiveIndicator() {
+  if (!splitViewEnabled) return;
+  const panelA = document.querySelector(".split_panel_a");
+  const panelB = document.querySelector(".split_panel_b");
+  if (panelA) panelA.classList.toggle("split_panel_active", activeSlot === "a");
+  if (panelB) panelB.classList.toggle("split_panel_active", activeSlot === "b");
+}
+
+function updateColumnHeaders() {
+  if (!splitViewEnabled) return;
+  const labels = ["a", "b"];
+  for (const slot of labels) {
+    const el = slot === "b" ? activeColumnHeaderB : activeColumnHeaderA;
+    if (!el) continue;
+    const s = _slotState[slot];
+    const cid = slot === activeSlot ? selectedCourseId : s.selectedCourseId;
+    const course = courses.find((c) => c.id === cid);
+    const name = course ? courseShortLabel(course) : "—";
+    el.textContent = name;
+  }
+}
+
+function enableSplitView() {
+  const hubContent = document.querySelector(".hub_content");
+  if (!hubContent) return;
+  const workContent = hubContent.querySelector(".work_content");
+  if (!workContent) return;
+
+  // Guard: already enabled
+  if (hubContent.classList.contains("hub_content_split")) return;
+
+  // Save current single-column state into slot a
+  saveSlotState("a");
+
+  // Initialise slot b (start mirroring slot a's course/week so it isn't empty)
+  if (_slotState.b.selectedCourseId === undefined) {
+    _slotState.b.selectedCourseId = selectedCourseId;
+    _slotState.b.currentWeek = currentWeek;
+    _slotState.b.items = [];
+    _slotState.b.availableWeeks = [];
+    _slotState.b.overviewData = null;
+    _slotState.b.unfinished = false;
+    _slotState.b.unknown = false;
+  }
+
+  hubContent.classList.add("hub_content_split");
+
+  // Keep the shared course pills at the top of work_content, then wrap only
+  // the item list + week nav into a split_area with two panels.
+
+  // Capture the existing single item list + week nav (these become panel A).
+  const originalItemList = workContent.querySelector("#item_list");
+  const originalWeekNav = workContent.querySelector(".week_nav");
+
+  // Create split_area wrapper
+  const splitArea = document.createElement("div");
+  splitArea.className = "split_area";
+
+  // ── Panel A ──
+  const panelA = document.createElement("div");
+  panelA.className = "split_panel split_panel_a split_panel_active";
+
+  const headerA = document.createElement("div");
+  headerA.className = "split_panel_header";
+  activeColumnHeaderA = document.createElement("span");
+  activeColumnHeaderA.className = "split_panel_course_label";
+  headerA.appendChild(activeColumnHeaderA);
+  panelA.appendChild(headerA);
+
+  // Move the existing item_list + week nav into panel A
+  const weekNavCloneA = originalWeekNav;
+  panelA.appendChild(originalItemList);
+  panelA.appendChild(weekNavCloneA);
+
+  // ── Panel B ──
+  const panelB = document.createElement("div");
+  panelB.className = "split_panel split_panel_b";
+
+  const headerB = document.createElement("div");
+  headerB.className = "split_panel_header";
+  activeColumnHeaderB = document.createElement("span");
+  activeColumnHeaderB.className = "split_panel_course_label";
+  headerB.appendChild(activeColumnHeaderB);
+  panelB.appendChild(headerB);
+
+  // Clone the item list + week nav for panel B, suffix ids with _b
+  const itemListBClone = originalItemList.cloneNode(true);
+  const weekNavBClone = originalWeekNav.cloneNode(true);
+  itemListBClone.id = "item_list_b";
+  itemListBClone.replaceChildren();
+  weekNavBClone.id = "week_nav_b";
+  weekNavBClone.querySelectorAll("[id]").forEach((el) => {
+    el.id = el.id + "_b";
+  });
+  panelB.appendChild(itemListBClone);
+  panelB.appendChild(weekNavBClone);
+
+  // Register panel B refs
+  itemListB = itemListBClone;
+  weekInputB = weekNavBClone.querySelector("#week_input_b");
+  prevWeekBtnB = weekNavBClone.querySelector("#prev_week_b");
+  nextWeekBtnB = weekNavBClone.querySelector("#next_week_b");
+
+  // Create divider
+  const divider = document.createElement("div");
+  divider.className = "split_divider";
+  divider.setAttribute("role", "separator");
+  divider.setAttribute("aria-label", "Resize split view");
+  initDividerDrag(divider);
+
+  splitArea.appendChild(panelA);
+  splitArea.appendChild(divider);
+  splitArea.appendChild(panelB);
+
+  // Insert split_area after the pills, before the sidebar
+  const pills = workContent.querySelector("#course_pills");
+  workContent.insertBefore(splitArea, pills.nextSibling);
+
+  activeSlot = "a";
+  syncActiveDomRefs();
+  syncFilterCheckboxes();
+  updateSplitViewActiveIndicator();
+  updateColumnHeaders();
+
+  // Render panel A
+  renderWorkView();
+
+  // Load slot b
+  const savedSlot = activeSlot;
+  switchToSlot("b");
+  updateColumnHeaders();
+  if (selectedCourseId) {
+    loadWeeks().then(() => {
+      loadItems();
+      loadOverview();
+    });
+  }
+
+  // Switch back to a
+  switchToSlot("a");
+  updateSidebarForSlot("a");
+  initPanelEvents();
+
+  _splitViewStructured = true;
+}
+
+function disableSplitView() {
+  const hubContent = document.querySelector(".hub_content");
+  if (!hubContent) return;
+  const workContent = hubContent.querySelector(".work_content");
+  if (!workContent) return;
+
+  if (!hubContent.classList.contains("hub_content_split")) return;
+
+  // Save slot b state before removing
+  saveSlotState("b");
+
+  hubContent.classList.remove("hub_content_split");
+
+  const splitArea = workContent.querySelector(".split_area");
+  const panelA = splitArea ? splitArea.querySelector(".split_panel_a") : null;
+  const panelB = splitArea ? splitArea.querySelector(".split_panel_b") : null;
+
+  if (panelA) {
+    // Move panel A's item list + week nav back to work_content (after pills)
+    const pills = workContent.querySelector("#course_pills");
+    const itemListA = panelA.querySelector("#item_list");
+    const weekNavA = panelA.querySelector(".week_nav");
+    if (itemListA) workContent.insertBefore(itemListA, pills ? pills.nextSibling : null);
+    if (weekNavA) workContent.appendChild(weekNavA);
+  }
+
+  // Remove split_area (and divider/panel B inside it)
+  if (splitArea) splitArea.remove();
+
+  // Clear panel B refs
+  itemListB = null;
+  prevWeekBtnB = null;
+  nextWeekBtnB = null;
+  weekInputB = null;
+  activeColumnHeaderA = null;
+  activeColumnHeaderB = null;
+
+  // Restore active slot to a
+  activeSlot = "a";
+  syncActiveDomRefs();
+  restoreSlotState("a");
+  renderWorkView();
+  if (selectedCourseId) {
+    updateSidebarForSlot("a");
+  }
+  _splitViewStructured = false;
+}
+
+// ── Shared Sidebar Update ──────────────────────────────────────
+
+function updateSidebarForSlot(slot) {
+  const state = _slotState[slot] || {};
+  const data = slot === activeSlot && overviewData ? overviewData : state.overviewData;
+  if (!data) return;
+  renderOverview(data);
+}
+
+// ── Draggable Divider ──────────────────────────────────────────
+
+function initDividerDrag(divider) {
+  let dragging = false;
+  let startPos = 0;
+  let startPercent = 50;
+  let isVertical = true; // true = column layout (desktop), false = row (mobile)
+
+  const savedRatio = Number(storageGet("splitRatio"));
+  if (Number.isFinite(savedRatio) && savedRatio > 20 && savedRatio < 80) {
+    const splitArea = document.querySelector(".split_area");
+    if (splitArea) {
+      splitArea.style.gridTemplateColumns = `${savedRatio}% auto ${100 - savedRatio}%`;
+    }
+  }
+
+  function applyColumns(percent) {
+    const splitArea = document.querySelector(".split_area");
+    if (!splitArea) return;
+    splitArea.style.gridTemplateColumns = `${percent}% auto ${100 - percent}%`;
+  }
+
+  function onPointerDown(e) {
+    const point = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0].clientX) || 0;
+    dragging = true;
+    isVertical = divider.offsetWidth >= divider.offsetHeight;
+    startPos = point;
+    const splitArea = document.querySelector(".split_area");
+    if (splitArea) {
+      startPercent = 50;
+    }
+    divider.classList.add("dragging");
+    document.body.style.cursor = isVertical ? "col-resize" : "row-resize";
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  }
+
+  function onPointerMove(e) {
+    if (!dragging) return;
+    const point = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0].clientX) || 0;
+    const splitArea = document.querySelector(".split_area");
+    if (!splitArea) return;
+    if (isVertical) {
+      const total = splitArea.offsetWidth;
+      const delta = point - startPos;
+      const deltaPercent = (delta / total) * 100;
+      let newPercent = Math.max(20, Math.min(80, startPercent + deltaPercent));
+      applyColumns(newPercent);
+    }
+  }
+
+  function onPointerUp() {
+    if (!dragging) return;
+    dragging = false;
+    divider.classList.remove("dragging");
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    const splitArea = document.querySelector(".split_area");
+    if (splitArea && isVertical) {
+      const cols = splitArea.style.gridTemplateColumns;
+      const firstCol = parseFloat(cols.split(" ")[0]);
+      const totalWidth = splitArea.offsetWidth;
+      const ratio = Math.round((firstCol / totalWidth) * 100);
+      storageSet("splitRatio", String(ratio));
+    }
+  }
+
+  divider.addEventListener("mousedown", onPointerDown);
+  divider.addEventListener("touchstart", onPointerDown, { passive: false });
+  document.addEventListener("mousemove", onPointerMove);
+  document.addEventListener("touchmove", onPointerMove, { passive: false });
+  document.addEventListener("mouseup", onPointerUp);
+  document.addEventListener("touchend", onPointerUp);
+
+  divider.addEventListener("dblclick", () => {
+    applyColumns(50);
+    storageSet("splitRatio", "50");
+  });
+}
+
+// ── Per-Panel Event Routing ────────────────────────────────────
+
+function initPanelEvents() {
+  if (!splitViewEnabled) return;
+  const panelA = document.querySelector(".split_panel_a");
+  const panelB = document.querySelector(".split_panel_b");
+
+  if (panelA) {
+    panelA.addEventListener("mousedown", (e) => {
+      if (activeSlot !== "a") switchToSlot("a");
+    });
+  }
+  if (panelB) {
+    panelB.addEventListener("mousedown", (e) => {
+      if (activeSlot !== "b") switchToSlot("b");
+    });
+  }
+
+  // Panel B week nav
+  if (prevWeekBtnB) prevWeekBtnB.addEventListener("click", (e) => { e.stopPropagation(); switchToSlot("b"); changeWeek(-1); });
+  if (nextWeekBtnB) nextWeekBtnB.addEventListener("click", (e) => { e.stopPropagation(); switchToSlot("b"); changeWeek(1); });
+  if (weekInputB) {
+    weekInputB.addEventListener("change", (e) => {
+      e.stopPropagation();
+      switchToSlot("b");
+      const val = Number(weekInputB.value);
+      if (Number.isFinite(val) && val >= 0) {
+        currentWeek = val;
+        storageSet("selectedWeek", String(currentWeek));
+        updateWeekNav();
+        loadItems();
+      }
+    });
+    weekInputB.addEventListener("blur", (e) => {
+      e.stopPropagation();
+      switchToSlot("b");
+      applyWeekFromInput();
+    });
+  }
+}
+
 let items = [];
 let courses = [];
 let subjectCounts = new Map();
@@ -1012,8 +1452,9 @@ function courseSubjectKey(course) {
   }
   const raw = parts[1].trim();
   // Map Vietnamese full subject names to canonical English keys. For the
-  // THCS.OP middle-school format (e.g. "THCS.OP-MATHS-TEACHER") the raw token
-  // is already a known key, so it passes through unchanged.
+  // THPT format (e.g. "TRANGPT68-HÓA HỌC-10-THPT-OCEAN PARK-2026 - 2027")
+  // parts[1] is the Vietnamese subject name which gets mapped via
+  // SUBJECT_NAME_TO_KEY.
   return SUBJECT_NAME_TO_KEY[raw] || raw || null;
 }
 
@@ -1100,11 +1541,11 @@ async function fetchJson(url, options = {}) {
     debugLog("fetchJson: error response body", data);
 
     if (response.status === 401) {
-      // Token expired or invalid - clear it and show setup
-      debugLog("fetchJson: got 401, clearing token and showing setup overlay");
+      // Token expired or invalid - clear it and show intro
+      debugLog("fetchJson: got 401, clearing token and showing intro overlay");
       clearToken();
       clearApiCache();
-      showSetupOverlay();
+      showIntroOverlay();
     }
     throw new Error(data.error || "Request failed.");
   }
@@ -1163,7 +1604,7 @@ function showMessage(text) {
 function showErrorMessage(text, retryFn) {
   itemList.innerHTML = "";
   const message = document.createElement("p");
-  message.className = "empty_message";
+  message.className = "error_message";
   message.textContent = text;
   itemList.appendChild(message);
 
@@ -1171,7 +1612,7 @@ function showErrorMessage(text, retryFn) {
     const retryBtn = document.createElement("button");
     retryBtn.type = "button";
     retryBtn.className = "error_retry_btn";
-    retryBtn.textContent = "Retry";
+    retryBtn.textContent = t("retry");
     retryBtn.addEventListener("click", () => {
       showSkeletonLoading();
       retryFn();
@@ -1348,10 +1789,45 @@ function showOverviewLoadingMessage() {
     messageKey = "overviewStillLoading";
   }
 
-  container.innerHTML = `<p class="empty_message">${t(messageKey)}</p>`;
+  let loadingMsg = container.querySelector(".overview_loading_message");
+  if (!loadingMsg) {
+    loadingMsg = document.createElement("p");
+    loadingMsg.className = "loading_message overview_loading_message";
+    container.appendChild(loadingMsg);
+  }
+  loadingMsg.textContent = t(messageKey);
 
-  // Schedule next update
-  overviewLoadingMessageTimer = setTimeout(showOverviewLoadingMessage, 1000);
+  // Schedule next update at the next milestone instead of polling every 1s
+  const milestones = [8000, 16000, 24000, 32000, 40000];
+  const nextMilestone = milestones.find((m) => m > elapsed);
+  if (nextMilestone) {
+    const delay = nextMilestone - elapsed;
+    overviewLoadingMessageTimer = setTimeout(showOverviewLoadingMessage, delay);
+  }
+}
+
+function showOverviewError(message, retryFn) {
+  const container = document.getElementById("week_overview_list");
+  if (!container) return;
+
+  container.replaceChildren();
+
+  const errorEl = document.createElement("p");
+  errorEl.className = "error_message";
+  errorEl.textContent = message;
+  container.appendChild(errorEl);
+
+  if (retryFn) {
+    const retryBtn = document.createElement("button");
+    retryBtn.type = "button";
+    retryBtn.className = "error_retry_btn";
+    retryBtn.textContent = t("retry");
+    retryBtn.addEventListener("click", () => {
+      showOverviewSkeleton();
+      retryFn();
+    });
+    container.appendChild(retryBtn);
+  }
 }
 
 function normalizeOverviewWeek(weekSummary) {
@@ -1796,7 +2272,7 @@ function openSubjectLabelEditor(subjectKey, pillElement) {
   setTimeout(() => nameInput.focus(), 0);
 
   // Setup click-outside and escape key handlers
-  setupPopoverCloseHandlers(popover, pillElement);
+  initPopoverCloseHandlers(popover, pillElement);
 }
 
 function positionPopoverBelow(popover, anchorElement) {
@@ -1820,7 +2296,7 @@ function positionPopoverBelow(popover, anchorElement) {
   popover.style.left = `${left}px`;
 }
 
-function setupPopoverCloseHandlers(popover, anchorElement) {
+function initPopoverCloseHandlers(popover, anchorElement) {
   // Click outside to close
   popoverOutsideClickHandler = function(e) {
     if (!popover.contains(e.target) && e.target !== anchorElement) {
@@ -1950,6 +2426,21 @@ async function loadCourses() {
       loadItems(bustCache),
       loadOverview(bustCache),
     ]);
+
+    // Seed slot B once split view is structured (initial load happens before
+    // courses are available, so both slots need populating here).
+    if (splitViewEnabled && _splitViewStructured) {
+      if (!_slotState.b.selectedCourseId) {
+        _slotState.b.selectedCourseId = selectedCourseId;
+        _slotState.b.currentWeek = currentWeek;
+      }
+      switchToSlot("b");
+      updateColumnHeaders();
+      await loadWeeks();
+      await Promise.all([loadItems(), loadOverview()]);
+      switchToSlot("a");
+      updateSidebarForSlot("a");
+    }
   } catch (error) {
     showErrorMessage(error.message, () => loadCourses());
   }
@@ -2005,10 +2496,10 @@ async function loadItems(bustCache = false) {
   // Add a "still loading" message after 10 seconds for slow Canvas responses
   const loadItemsTimeout = setTimeout(() => {
     if (itemList.querySelector('.skeleton_item')) {
+      itemList.innerHTML = "";
       const stillLoading = document.createElement("p");
-      stillLoading.className = "empty_message";
+      stillLoading.className = "loading_message";
       stillLoading.textContent = t("overviewStillLoading");
-      stillLoading.style.marginTop = "12px";
       itemList.appendChild(stillLoading);
     }
   }, 10000);
@@ -2036,6 +2527,9 @@ async function loadItems(bustCache = false) {
 async function selectCourse(courseId) {
   if (subjectLabelEditMode) return; // Don't switch courses in edit mode
   selectedCourseId = courseId;
+  if (splitViewEnabled) {
+    _slotState[activeSlot].selectedCourseId = courseId;
+  }
   storageSet("selectedCourseId", String(courseId));
   renderCoursePills();
   showSkeletonLoading();
@@ -2048,6 +2542,12 @@ async function selectCourse(courseId) {
     loadOverview(),
   ]);
   setFiltersEnabled(true);
+
+  // Update the shared sidebar when in split view
+  if (splitViewEnabled) {
+    updateSidebarForSlot(activeSlot);
+    updateColumnHeaders();
+  }
 }
 
 function changeWeek(delta) {
@@ -2950,38 +3450,53 @@ function applyManualCompletionsToOverview(overviewData) {
 async function loadOverview(bustCache = false) {
   if (!selectedCourseId) return;
 
-  // Cancel any previous overview request to prevent race conditions
-  if (currentOverviewController) {
-    currentOverviewController.abort();
-  }
+  // Capture which slot owns this load so async completion updates the right
+  // slot's state and only touches the shared sidebar if that slot is active.
+  const loadSlot = splitViewEnabled ? activeSlot : "a";
+  const loadCourseId = selectedCourseId;
+
+  // Cancel any previous overview request for this slot to prevent race conditions
+  const prevController = splitViewEnabled ? _slotState[loadSlot].currentOverviewController : currentOverviewController;
+  if (prevController) prevController.abort();
   const thisOverviewController = new AbortController();
-  currentOverviewController = thisOverviewController;
+  if (splitViewEnabled) {
+    _slotState[loadSlot].currentOverviewController = thisOverviewController;
+  } else {
+    currentOverviewController = thisOverviewController;
+  }
   const signal = thisOverviewController.signal;
 
-  overviewData = null;
-  overviewLoadStartTime = Date.now();
-  
-  // Show skeleton immediately to replace stale data from previous course
-  clearOverviewLoadingMessageTimer();
-  showOverviewSkeleton();
-  overviewLoadingMessageTimer = setTimeout(showOverviewLoadingMessage, 8000);
+  // The shared sidebar only shows the active slot's overview, so skeleton and
+  // loading messages are only meaningful when this slot is active.
+  if (loadSlot === activeSlot) {
+    overviewData = null;
+    overviewLoadStartTime = Date.now();
+    clearOverviewLoadingMessageTimer();
+    showOverviewSkeleton();
+    overviewLoadingMessageTimer = setTimeout(showOverviewLoadingMessage, 8000);
+  }
 
   try {
     // Use the dedicated overview endpoint for a single efficient call
     // Cache-bust on initial load to ensure fresh completion data from Canvas
-    const overviewUrl = `/api/courses/${selectedCourseId}/overview`;
+    const overviewUrl = `/api/courses/${loadCourseId}/overview`;
     const cacheBustParam = bustCache ? `?_t=${Date.now()}` : "";
     const data = await fetchJson(`${overviewUrl}${cacheBustParam}`, { signal });
 
-    overviewData = normalizeOverviewData(data);
+    const normalized = normalizeOverviewData(data);
 
     // Apply manual completions before computing progress for bars
-    const adjusted = applyManualCompletionsToOverview(overviewData);
+    const adjusted = applyManualCompletionsToOverview(normalized);
+
+    // Store overview for the owning slot
+    if (splitViewEnabled) {
+      _slotState[loadSlot].overviewData = adjusted;
+    }
 
     // Store course progress for progress bars (use adjusted totals so manual
     // completions are reflected in the bar, matching the semester progress)
     if (adjusted && adjusted.totals) {
-      courseProgress.set(selectedCourseId, {
+      courseProgress.set(loadCourseId, {
         done: adjusted.totals.done || 0,
         total: adjusted.totals.total || 0,
       });
@@ -2989,17 +3504,24 @@ async function loadOverview(bustCache = false) {
       renderCoursePills();
     }
 
-    // Stop loading messages
-    clearOverviewLoadingMessageTimer();
-    
-    renderOverview(adjusted);
+    // Only update the shared sidebar / loading state if this slot is active
+    if (loadSlot === activeSlot) {
+      overviewData = adjusted;
+      clearOverviewLoadingMessageTimer();
+      renderOverview(adjusted);
+    }
   } catch (error) {
     if (error.name === 'AbortError') return;
-    // Stop loading messages on error
-    clearOverviewLoadingMessageTimer();
-    // The loading message will be replaced on retry
+    if (loadSlot === activeSlot) {
+      clearOverviewLoadingMessageTimer();
+      showOverviewError(error.message, () => loadOverview());
+    }
   } finally {
-    currentOverviewController = null;
+    if (splitViewEnabled) {
+      _slotState[loadSlot].currentOverviewController = null;
+    } else {
+      currentOverviewController = null;
+    }
   }
 }
 
@@ -3012,27 +3534,27 @@ function renderOverview(data) {
 }
 
 function showOverviewSkeleton() {
-  // Reset numeric displays to placeholders
+  // Reset numeric displays to shimmer placeholders
   const doneEl = document.getElementById("semester_done");
   const totalEl = document.getElementById("semester_total");
   const percentEl = document.getElementById("semester_percent");
-  if (doneEl) doneEl.textContent = "-";
-  if (totalEl) totalEl.textContent = "-";
-  if (percentEl) percentEl.textContent = "-";
+  if (doneEl) doneEl.innerHTML = '<span class="semester_progress_fraction_skeleton">&nbsp;</span>';
+  if (totalEl) totalEl.innerHTML = '<span class="semester_progress_fraction_skeleton" style="width:40px;height:16px">&nbsp;</span>';
+  if (percentEl) percentEl.innerHTML = '<span class="semester_progress_percent_skeleton">&nbsp;</span>';
 
-  // Clear progress bar
+  // Show shimmer progress bar
   const barContainer = document.getElementById("semester_progress_bar");
-  if (barContainer) barContainer.innerHTML = "";
+  if (barContainer) barContainer.innerHTML = '<div class="semester_progress_bar_skeleton" style="width:100%"></div>';
 
-  // Reset stats grid
+  // Reset stats grid to shimmer placeholders
   const statWeeks = document.getElementById("stat_weeks");
   const statUnknown = document.getElementById("stat_unknown");
   const statDone = document.getElementById("stat_done");
   const statUnfinished = document.getElementById("stat_unfinished");
-  if (statWeeks) statWeeks.textContent = "-";
-  if (statUnknown) statUnknown.textContent = "-";
-  if (statDone) statDone.textContent = "-";
-  if (statUnfinished) statUnfinished.textContent = "-";
+  if (statWeeks) statWeeks.innerHTML = '<span class="stat_count_skeleton">&nbsp;</span>';
+  if (statUnknown) statUnknown.innerHTML = '<span class="stat_count_skeleton">&nbsp;</span>';
+  if (statDone) statDone.innerHTML = '<span class="stat_count_skeleton">&nbsp;</span>';
+  if (statUnfinished) statUnfinished.innerHTML = '<span class="stat_count_skeleton">&nbsp;</span>';
 
   // Hide warning banner
   const banner = document.getElementById("warning_banner");
@@ -3459,8 +3981,8 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  // Don't navigate weeks if the setup overlay is open
-  const overlay = document.getElementById("setup_overlay");
+  // Don't navigate weeks if the intro overlay is open
+  const overlay = document.getElementById("intro_overlay");
   if (overlay && !overlay.hidden) return;
 
   // Don't trigger shortcuts while any modal/dialog is open
@@ -3481,21 +4003,25 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     unfinishedOnly.checked = !unfinishedOnly.checked;
     if (unfinishedOnly.checked) unknownOnly.checked = false;
+    commitFilterState();
     loadItems();
   } else if (event.key === "f") {
     event.preventDefault();
     unknownOnly.checked = !unknownOnly.checked;
     if (unknownOnly.checked) unfinishedOnly.checked = false;
+    commitFilterState();
     loadItems();
   }
 });
 
 unfinishedOnly.addEventListener("click", () => {
   if (unfinishedOnly.checked) unknownOnly.checked = false;
+  commitFilterState();
   loadItems();
 });
 unknownOnly.addEventListener("click", () => {
   if (unknownOnly.checked) unfinishedOnly.checked = false;
+  commitFilterState();
   loadItems();
 });
 
@@ -3591,242 +4117,378 @@ applyTheme(savedTheme);
 
 themeToggle.addEventListener("click", toggleTheme);
 
-// ── Setup Wizard ───────────────────────────────────────────────
+// ── Intro Wizard ──────────────────────────────────────────────
 
-const SETUP_STEPS = [
-  { titleKey: "setupStep1Title", descKey: "setupStep1Desc" },
-  { titleKey: "setupStep2Title", descKey: "setupStep2Desc" },
-  { titleKey: "setupStep3Title", descKey: "setupStep3Desc" },
-  { titleKey: "setupStep4Title", descKey: "setupStep4Desc" },
-  { titleKey: "setupStep5Title", descKey: "setupStep5Desc", noteKey: "setupStep5Note" },
-  { titleKey: "setupStep6Title", descKey: "setupStep6Desc", noteKey: "setupStep6Note" },
-  { titleKey: "setupSecurityTitle", descKey: "setupSecurityDesc", isSecurity: true },
+// Hybrid intro wizard: two intro steps, then a "choose login method" step with
+// tabs — OAuth (recommended, default) and Manual Token (legacy fallback).
+const INTRO_STEPS = [
+  { titleKey: "introStep1Title", descKey: "introStep1Desc", image: "/static/images/work-view.png" },
+  { titleKey: "introStep2Title", descKey: "introStep2Desc", image: "/static/images/timetable.png" },
+  { titleKey: "introChooseTitle", descKey: "introChooseDesc", isChoice: true },
 ];
 
-function renderSetupStep(stepIndex) {
-  debugLog("renderSetupStep called, stepIndex:", stepIndex);
-  const step = SETUP_STEPS[stepIndex];
+let introActiveTab = "oauth"; // "oauth" | "manual"
+let introOAuthConfigured = false;
+let introPendingOAuthError = null;
+let introReopenMode = false; // wizard opened from Settings → closing is free
+
+const INTRO_OAUTH_ERROR_KEY_MAP = {
+  access_denied: "introOAuthErrorAccessDenied",
+  invalid_request: "introOAuthErrorInvalidRequest",
+  server_error: "introOAuthErrorServerError",
+};
+
+function introOAuthErrorKey(raw) {
+  return INTRO_OAUTH_ERROR_KEY_MAP[raw] || "introOAuthErrorUnknown";
+}
+
+function renderIntroStep(stepIndex) {
+  debugLog("renderIntroStep called, stepIndex:", stepIndex);
+  const step = INTRO_STEPS[stepIndex];
   if (!step) {
-    debugLog("renderSetupStep: no step found for index", stepIndex);
+    debugLog("renderIntroStep: no step found for index", stepIndex);
     return;
   }
 
-  const content = document.getElementById("setup_content");
+  const content = document.getElementById("intro_content");
   content.innerHTML = "";
 
   // Step indicator
   const indicator = document.createElement("p");
-  indicator.className = "setup_step_indicator";
+  indicator.className = "intro_step_indicator";
   indicator.setAttribute("data-step", String(stepIndex + 1));
-  indicator.textContent = `${t("setupStep")} ${stepIndex + 1} ${t("setupOf")} ${SETUP_STEPS.length}`;
+  indicator.textContent = `${t("introStep")} ${stepIndex + 1} ${t("introOf")} ${INTRO_STEPS.length}`;
   content.appendChild(indicator);
 
   // Title
   const title = document.createElement("h2");
-  title.className = "setup_step_title";
+  title.className = "intro_step_title";
   title.textContent = t(step.titleKey);
   content.appendChild(title);
 
-  // Screenshot — one per step, mapped 1:1 (step 1 → setup_step0.jpg, ..., step 7 → setup_step6.jpg).
-  // Not shown on the final security step (token entry).
-  if (!step.isSecurity) {
+  // Navigation buttons (defined before if/else so both branches can use them)
+  const nav = document.createElement("div");
+  nav.className = "intro_nav";
+
+  // Step dots
+  const dots = document.createElement("div");
+  dots.className = "intro_dots";
+  for (let i = 0; i < INTRO_STEPS.length; i++) {
+    const dot = document.createElement("span");
+    dot.className = `intro_dot${i === stepIndex ? " intro_dot_active" : ""}`;
+    dot.addEventListener("click", () => renderIntroStep(i));
+    dots.appendChild(dot);
+  }
+
+  // Final step: choose login method via tabs (OAuth recommended / manual fallback)
+  if (step.isChoice) {
+    renderIntroChoiceStep(content, nav, dots, stepIndex);
+    content.appendChild(nav);
+    content.appendChild(dots);
+    return;
+  }
+
+  // Screenshot — one per intro step.
+  if (step.image) {
     const screenshot = document.createElement("img");
-    screenshot.className = "setup_screenshot";
-    screenshot.src = `/static/images/setup_step${stepIndex + 1}.jpg`;
+    screenshot.className = "intro_screenshot";
+    screenshot.src = step.image;
     screenshot.alt = t(step.titleKey);
     screenshot.loading = "lazy";
     content.appendChild(screenshot);
   }
 
   // Description
-  if (!step.isSecurity) {
-    const desc = document.createElement("p");
-    desc.className = "setup_step_desc";
-    desc.textContent = t(step.descKey);
-    content.appendChild(desc);
-  }
+  const desc = document.createElement("p");
+  desc.className = "intro_step_desc";
+  desc.textContent = t(step.descKey);
+  content.appendChild(desc);
 
-  // Optional note (for step 5 - expiry info)
+  // Optional note
   if (step.noteKey) {
     const note = document.createElement("p");
-    note.className = "setup_step_note";
+    note.className = "intro_step_note";
     note.textContent = t(step.noteKey);
     content.appendChild(note);
   }
 
-  // Navigation buttons (defined before if/else so both branches can use them)
-  const nav = document.createElement("div");
-  nav.className = "setup_nav";
-
-  // Step dots
-  const dots = document.createElement("div");
-  dots.className = "setup_dots";
-  for (let i = 0; i < SETUP_STEPS.length; i++) {
-    const dot = document.createElement("span");
-    dot.className = `setup_dot${i === stepIndex ? " setup_dot_active" : ""}`;
-    dot.addEventListener("click", () => renderSetupStep(i));
-    dots.appendChild(dot);
+  // Non-final steps: Back + Next navigation
+  if (stepIndex > 0) {
+    const prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.className = "intro_nav_btn intro_nav_btn_prev";
+    prevBtn.textContent = t("introPrev");
+    prevBtn.addEventListener("click", () => renderIntroStep(stepIndex - 1));
+    nav.appendChild(prevBtn);
+  } else {
+    const spacer = document.createElement("div");
+    nav.appendChild(spacer);
   }
 
-  // Final step: Security notice + T&C agreement + token input
-  if (step.isSecurity) {
-    // Token input: let user paste their API token
-    const tokenLabel = document.createElement("p");
-    tokenLabel.className = "setup_step_desc";
-    tokenLabel.textContent = t("setupTokenLabel");
-    content.appendChild(tokenLabel);
-
-    const inputGroup = document.createElement("div");
-    inputGroup.className = "setup_token_group";
-
-    const input = document.createElement("input");
-    input.type = "password";
-    input.id = "setup_token_input";
-    input.className = "setup_token_input";
-    input.placeholder = t("setupTokenPlaceholder");
-    input.autocomplete = "off";
-    input.spellcheck = false;
-    inputGroup.appendChild(input);
-
-    // Show/hide toggle button
-    const toggleBtn = document.createElement("button");
-    toggleBtn.type = "button";
-    toggleBtn.className = "token_toggle_btn";
-    toggleBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye-slash" viewBox="0 0 16 16"><path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z"/><path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829"/><path d="M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12-1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z"/></svg>`;
-    toggleBtn.setAttribute("aria-label", "Toggle token visibility");
-    toggleBtn.addEventListener("click", () => {
-      const isPassword = input.type === "password";
-      input.type = isPassword ? "text" : "password";
-      toggleBtn.innerHTML = isPassword
-        ? `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/></svg>`
-        : `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye-slash" viewBox="0 0 16 16"><path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z"/><path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829"/><path d="M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12-1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z"/></svg>`;
-    });
-    inputGroup.appendChild(toggleBtn);
-
-    // T&C agreement checkbox (must be created before validateBtn handler)
-    const tcGroup = document.createElement("div");
-    tcGroup.className = "setup_tc_group";
-
-    const tcCheckbox = document.createElement("input");
-    tcCheckbox.type = "checkbox";
-    tcCheckbox.id = "setup_tc_checkbox";
-    tcCheckbox.className = "setup_tc_checkbox";
-
-    const tcLabel = document.createElement("label");
-    tcLabel.className = "setup_tc_label";
-    tcLabel.setAttribute("for", "setup_tc_checkbox");
-    
-    const tcLabelText = document.createElement("span");
-    tcLabelText.textContent = t("tcAgreeCheckbox");
-    
-    const tcLink = document.createElement("button");
-    tcLink.type = "button";
-    tcLink.className = "setup_tc_link";
-    tcLink.textContent = t("tcViewTerms");
-    tcLink.addEventListener("click", (e) => {
-      e.preventDefault();
-      openTermsModal();
-    });
-    
-    tcLabel.append(tcLabelText, " ", tcLink);
-    tcGroup.append(tcCheckbox, tcLabel);
-
-    // Message area (hidden by default, shown when an error/success/info message is set)
-    const msg = document.createElement("p");
-    msg.id = "setup_message";
-    msg.className = "setup_message";
-    msg.hidden = true;
-    content.appendChild(msg);
-
-    const validateBtn = document.createElement("button");
-    validateBtn.type = "button";
-    validateBtn.className = "setup_validate_btn";
-    validateBtn.textContent = t("setupValidate");
-    validateBtn.addEventListener("click", () => {
-      if (!tcCheckbox.checked) {
-        msg.textContent = t("setupTcError");
-        msg.className = "setup_message setup_message_error";
-        msg.hidden = false;
-        return;
-      }
-      validateAndSaveToken();
-    });
-    inputGroup.appendChild(validateBtn);
-
-    content.appendChild(inputGroup);
-
-    // API warning text
-    const apiWarning = document.createElement("p");
-    apiWarning.className = "setup_api_warning";
-    apiWarning.textContent = t("tcApiWarning");
-    content.appendChild(apiWarning);
-    
-    content.appendChild(tcGroup);
-
-    tcCheckbox.addEventListener("change", () => {
-      validateBtn.disabled = !tcCheckbox.checked;
-    });
-    
-    // Build nav: Back button only
-    if (stepIndex > 0) {
-      const prevBtn = document.createElement("button");
-      prevBtn.type = "button";
-      prevBtn.className = "setup_nav_btn setup_nav_btn_prev";
-      prevBtn.textContent = t("setupPrev");
-      prevBtn.addEventListener("click", () => renderSetupStep(stepIndex - 1));
-      nav.appendChild(prevBtn);
-    }
-    
-    // Hide step dots on final step
-    dots.style.display = "none";
-  } else {
-    // Non-final steps: Back + Next navigation
-    if (stepIndex > 0) {
-      const prevBtn = document.createElement("button");
-      prevBtn.type = "button";
-      prevBtn.className = "setup_nav_btn setup_nav_btn_prev";
-      prevBtn.textContent = t("setupPrev");
-      prevBtn.addEventListener("click", () => renderSetupStep(stepIndex - 1));
-      nav.appendChild(prevBtn);
-    } else {
-      const spacer = document.createElement("div");
-      nav.appendChild(spacer);
-    }
-
-    if (stepIndex < SETUP_STEPS.length - 1) {
-      const nextBtn = document.createElement("button");
-      nextBtn.type = "button";
-      nextBtn.className = "setup_nav_btn setup_nav_btn_next";
-      nextBtn.textContent = t("setupNext");
-      nextBtn.addEventListener("click", () => renderSetupStep(stepIndex + 1));
-      nav.appendChild(nextBtn);
-    }
+  if (stepIndex < INTRO_STEPS.length - 1) {
+    const nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.className = "intro_nav_btn intro_nav_btn_next";
+    nextBtn.textContent = t("introNext");
+    nextBtn.addEventListener("click", () => renderIntroStep(stepIndex + 1));
+    nav.appendChild(nextBtn);
   }
 
   content.appendChild(nav);
   content.appendChild(dots);
+}
 
-  // Focus token input if on step 6
-  if (stepIndex === SETUP_STEPS.length - 1) {
-    setTimeout(() => document.getElementById("setup_token_input")?.focus(), 100);
+function renderIntroChoiceStep(content, nav, dots, stepIndex) {
+  // Choice description
+  const desc = document.createElement("p");
+  desc.className = "intro_step_desc";
+  desc.textContent = t(introStepDescKeyForChoice());
+  content.appendChild(desc);
+
+  // Tab bar: OAuth (default) + Manual Token
+  const tabBar = document.createElement("div");
+  tabBar.className = "intro_tab_bar";
+
+  const oauthTab = document.createElement("button");
+  oauthTab.type = "button";
+  oauthTab.className = "intro_tab_btn intro_tab_oauth";
+  oauthTab.textContent = t("introTabOAuth");
+
+  const manualTab = document.createElement("button");
+  manualTab.type = "button";
+  manualTab.className = "intro_tab_btn intro_tab_manual";
+  manualTab.textContent = t("introTabManual");
+
+  tabBar.append(oauthTab, manualTab);
+  content.appendChild(tabBar);
+
+  // Panels
+  const oauthPanel = document.createElement("div");
+  oauthPanel.className = "intro_tab_panel intro_panel_oauth";
+  const manualPanel = document.createElement("div");
+  manualPanel.className = "intro_tab_panel intro_panel_manual";
+  content.append(oauthPanel, manualPanel);
+
+  function setActiveTab(tab) {
+    introActiveTab = tab;
+    const isOauth = tab === "oauth";
+    oauthTab.classList.toggle("intro_tab_active", isOauth);
+    manualTab.classList.toggle("intro_tab_active", !isOauth);
+    oauthPanel.hidden = !isOauth;
+    manualPanel.hidden = isOauth;
+    // Restore focus to the manual token input when switching to that tab
+    if (!isOauth) {
+      setTimeout(() => document.getElementById("intro_token_input")?.focus(), 100);
+    }
+  }
+
+  oauthTab.addEventListener("click", () => setActiveTab("oauth"));
+  manualTab.addEventListener("click", () => setActiveTab("manual"));
+
+  // Build panels
+  renderIntroOAuthPanel(oauthPanel);
+  renderIntroManualTokenPanel(manualPanel);
+
+  // Back button only on the choice step
+  if (stepIndex > 0) {
+    const prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.className = "intro_nav_btn intro_nav_btn_prev";
+    prevBtn.textContent = t("introPrev");
+    prevBtn.addEventListener("click", () => renderIntroStep(stepIndex - 1));
+    nav.appendChild(prevBtn);
+  }
+
+  // Hide step dots on final step
+  dots.style.display = "none";
+
+  // Show the tab chosen by the user (OAuth by default). Any pending OAuth
+  // error is rendered inside the OAuth panel.
+  setActiveTab(introActiveTab);
+}
+
+function introStepDescKeyForChoice() {
+  return "introChooseDesc";
+}
+
+async function renderIntroOAuthPanel(panel) {
+  panel.innerHTML = "";
+
+  // Pending OAuth error (from ?oauth_error= redirect) shown on this panel,
+  // then consumed so it isn't re-shown after the user switches tabs.
+  if (introPendingOAuthError) {
+    const err = document.createElement("p");
+    err.className = "intro_message intro_message_error";
+    err.textContent = introPendingOAuthError;
+    panel.appendChild(err);
+    introPendingOAuthError = null;
+  }
+
+  const title = document.createElement("h3");
+  title.className = "intro_tab_panel_title";
+  title.textContent = t("introOAuthTitle");
+  panel.appendChild(title);
+
+  const info = document.createElement("p");
+  info.className = "intro_step_desc";
+  info.textContent = t("introOAuthDesc");
+  panel.appendChild(info);
+
+  const connectWrap = document.createElement("div");
+  connectWrap.className = "intro_oauth_wrap";
+
+  const connectBtn = document.createElement("button");
+  connectBtn.type = "button";
+  connectBtn.className = "intro_oauth_btn";
+  connectBtn.textContent = t("introOAuthConnect");
+
+  const statusHint = document.createElement("p");
+  statusHint.className = "intro_step_note";
+  statusHint.hidden = true;
+
+  connectWrap.append(connectBtn, statusHint);
+  panel.appendChild(connectWrap);
+
+  // Check whether OAuth is configured server-side before enabling the button.
+  try {
+    const res = await fetch("/auth/config");
+    const data = await res.json();
+    introOAuthConfigured = !!(data && data.oauth_enabled);
+  } catch (err) {
+    debugLog("renderIntroOAuthPanel: /auth/config failed", err.message);
+    introOAuthConfigured = false;
+  }
+
+  if (introOAuthConfigured) {
+    connectBtn.disabled = false;
+    connectBtn.addEventListener("click", () => {
+      window.location.href = "/auth/canvas";
+    });
+  } else {
+    connectBtn.disabled = true;
+    statusHint.hidden = false;
+    statusHint.textContent = t("introOAuthUnavailable");
   }
 }
 
+function renderIntroManualTokenPanel(panel) {
+  const title = document.createElement("h3");
+  title.className = "intro_tab_panel_title";
+  title.textContent = t("introManualTitle");
+  panel.appendChild(title);
+
+  const info = document.createElement("p");
+  info.className = "intro_step_desc";
+  info.textContent = t("introManualDesc");
+  panel.appendChild(info);
+
+  const inputGroup = document.createElement("div");
+  inputGroup.className = "intro_token_group";
+
+  const input = document.createElement("input");
+  input.type = "password";
+  input.id = "intro_token_input";
+  input.className = "intro_token_input";
+  input.placeholder = t("introTokenPlaceholder");
+  input.autocomplete = "off";
+  input.spellcheck = false;
+  inputGroup.appendChild(input);
+
+  // Show/hide toggle button
+  const toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.className = "token_toggle_btn";
+  toggleBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye-slash" viewBox="0 0 16 16"><path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z"/><path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829"/><path d="M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12-1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z"/></svg>`;
+  toggleBtn.setAttribute("aria-label", "Toggle token visibility");
+  toggleBtn.addEventListener("click", () => {
+    const isPassword = input.type === "password";
+    input.type = isPassword ? "text" : "password";
+    toggleBtn.innerHTML = isPassword
+      ? `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/></svg>`
+      : `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye-slash" viewBox="0 0 16 16"><path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z"/><path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829"/><path d="M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12-1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z"/></svg>`;
+  });
+  inputGroup.appendChild(toggleBtn);
+
+  // T&C agreement checkbox (must be created before validateBtn handler)
+  const tcGroup = document.createElement("div");
+  tcGroup.className = "intro_tc_group";
+
+  const tcCheckbox = document.createElement("input");
+  tcCheckbox.type = "checkbox";
+  tcCheckbox.id = "intro_tc_checkbox";
+  tcCheckbox.className = "intro_tc_checkbox";
+
+  const tcLabel = document.createElement("label");
+  tcLabel.className = "intro_tc_label";
+  tcLabel.setAttribute("for", "intro_tc_checkbox");
+
+  const tcLabelText = document.createElement("span");
+  tcLabelText.textContent = t("tcAgreeCheckbox");
+
+  const tcLink = document.createElement("button");
+  tcLink.type = "button";
+  tcLink.className = "intro_tc_link";
+  tcLink.textContent = t("tcViewTerms");
+  tcLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    openTermsModal();
+  });
+
+  tcLabel.append(tcLabelText, " ", tcLink);
+  tcGroup.append(tcCheckbox, tcLabel);
+
+  // Message area
+  const msg = document.createElement("p");
+  msg.id = "intro_message";
+  msg.className = "intro_message";
+  msg.hidden = true;
+  panel.appendChild(msg);
+
+  const validateBtn = document.createElement("button");
+  validateBtn.type = "button";
+  validateBtn.className = "intro_validate_btn";
+  validateBtn.textContent = t("introValidate");
+  validateBtn.addEventListener("click", () => {
+    if (!tcCheckbox.checked) {
+      msg.textContent = t("introTcError");
+      msg.className = "intro_message intro_message_error";
+      msg.hidden = false;
+      return;
+    }
+    validateAndSaveToken();
+  });
+  inputGroup.appendChild(validateBtn);
+
+  panel.appendChild(inputGroup);
+
+  // API warning text
+  const apiWarning = document.createElement("p");
+  apiWarning.className = "intro_api_warning";
+  apiWarning.textContent = t("tcApiWarning");
+  panel.appendChild(apiWarning);
+
+  panel.appendChild(tcGroup);
+
+  tcCheckbox.addEventListener("change", () => {
+    validateBtn.disabled = !tcCheckbox.checked;
+  });
+}
+
 async function validateAndSaveToken() {
-  const input = document.getElementById("setup_token_input");
-  const msg = document.getElementById("setup_message");
+  const input = document.getElementById("intro_token_input");
+  const msg = document.getElementById("intro_message");
   const token = input.value.trim();
   debugLog("validateAndSaveToken called, token present:", !!token);
 
   if (!token) {
-    msg.textContent = t("setupError");
-    msg.className = "setup_message setup_message_error";
+    msg.textContent = t("introError");
+    msg.className = "intro_message intro_message_error";
     msg.hidden = false;
     return;
   }
 
-  msg.textContent = t("setupValidating");
-  msg.className = "setup_message setup_message_info";
+  msg.textContent = t("introValidating");
+  msg.className = "intro_message intro_message_info";
   msg.hidden = false;
 
   try {
@@ -3843,90 +4505,121 @@ async function validateAndSaveToken() {
     if (data.valid) {
       debugLog("validateAndSaveToken: token is valid, saving");
       saveToken(token);
-      msg.textContent = t("setupSuccess");
-      msg.className = "setup_message setup_message_success";
+      msg.textContent = t("introSuccess");
+      msg.className = "intro_message intro_message_success";
       setTimeout(() => {
         debugLog("validateAndSaveToken: hiding overlay and reinitializing");
-        hideSetupOverlay();
+        hideIntroOverlay();
         reinitializeApp();
       }, 1000);
     } else {
       debugLog("validateAndSaveToken: token invalid:", data.message);
-      msg.textContent = data.message || t("setupError");
-      msg.className = "setup_message setup_message_error";
+      msg.textContent = data.message || t("introError");
+      msg.className = "intro_message intro_message_error";
     }
   } catch (err) {
     debugLog("validateAndSaveToken: error:", err.message);
-    msg.textContent = t("setupError");
-    msg.className = "setup_message setup_message_error";
+    msg.textContent = t("introError");
+    msg.className = "intro_message intro_message_error";
   }
 }
 
-function showSetupOverlay() {
-  debugLog("showSetupOverlay called");
-  // Close settings modal if it's open to prevent overlap
-  const settingsModal = document.getElementById("token_settings_modal");
-  if (settingsModal) {
-    removeModal(settingsModal);
-    debugLog("showSetupOverlay: removed settings modal");
+function showIntroOverlay(startAtChoice) {
+  debugLog("showIntroOverlay called, startAtChoice:", startAtChoice);
+  // Close settings modals if they're open to prevent overlap
+  for (const id of ["settings_menu_modal", "token_settings_modal"]) {
+    const settingsModal = document.getElementById(id);
+    if (settingsModal) {
+      removeModal(settingsModal);
+      debugLog("showIntroOverlay: removed", id);
+    }
   }
 
-  const overlay = document.getElementById("setup_overlay");
+  // When opened from Settings, closing the wizard should be free (no "you
+  // haven't signed in" warning) — the user is already past onboarding.
+  introReopenMode = !!startAtChoice;
+
+  // Detect ?oauth_error= / ?oauth_success= query params left by the callback
+  // redirect and surface a safe, user-friendly message in the wizard.
+  const urlParams = new URLSearchParams(window.location.search);
+  const oauthError = urlParams.get("oauth_error");
+  const oauthSuccess = urlParams.get("oauth_success");
+  introPendingOAuthError = null;
+  if (oauthError) {
+    introPendingOAuthError = t(introOAuthErrorKey(oauthError));
+    // Keep the OAuth tab active (default) so the error message is visible
+    // right under the "Connect with Canvas" button.
+    introActiveTab = "oauth";
+  }
+  // Clean the params from the URL bar (no reload) to prevent re-triggering on refresh.
+  if (oauthError || oauthSuccess) {
+    urlParams.delete("oauth_error");
+    urlParams.delete("oauth_success");
+    const qs = urlParams.toString();
+    const clean = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState({}, "", clean);
+  }
+
+  const overlay = document.getElementById("intro_overlay");
   if (overlay) {
     overlay.hidden = false;
     // Update dynamic header text
-    const titleEl = document.getElementById("setup_title");
-    if (titleEl) titleEl.textContent = t("setupTitle");
-    const subtitleEl = document.getElementById("setup_subtitle");
-    if (subtitleEl) subtitleEl.textContent = t("setupSubtitle");
-    const skipBtn = document.getElementById("setup_skip_btn");
-    if (skipBtn) skipBtn.textContent = t("setupSkip");
+    const titleEl = document.getElementById("intro_title");
+    if (titleEl) titleEl.textContent = t("introTitle");
+    const subtitleEl = document.getElementById("intro_subtitle");
+    if (subtitleEl) subtitleEl.textContent = t("introSubtitle");
 
     // Hide the warning by default — it is only shown when the user tries to
     // exit the wizard without having provided an API token.
-    const warningEl = document.getElementById("setup_warning");
+    const warningEl = document.getElementById("intro_warning");
     if (warningEl) warningEl.hidden = true;
 
-    debugLog("showSetupOverlay: overlay unhidden, calling renderSetupStep(0)");
-    renderSetupStep(0);
+    // Jump straight to the choice step when re-connecting from Settings; a
+    // pending OAuth error also jumps there so the message is visible. Runs of
+    // the wizard otherwise start at the beginning.
+    const jumpToChoice = startAtChoice || introPendingOAuthError;
+    debugLog("showIntroOverlay: overlay unhidden, calling renderIntroStep", jumpToChoice ? INTRO_STEPS.length - 1 : 0);
+    renderIntroStep(jumpToChoice ? INTRO_STEPS.length - 1 : 0);
   } else {
-    debugLog("showSetupOverlay: overlay element NOT FOUND (DOM not ready?)");
+    debugLog("showIntroOverlay: overlay element NOT FOUND (DOM not ready?)");
   }
 }
 
-function hideSetupOverlay() {
-  debugLog("hideSetupOverlay called");
-  const overlay = document.getElementById("setup_overlay");
+function hideIntroOverlay() {
+  debugLog("hideIntroOverlay called");
+  introReopenMode = false;
+  const overlay = document.getElementById("intro_overlay");
   if (overlay) {
     overlay.hidden = true;
-    debugLog("hideSetupOverlay: overlay hidden");
+    debugLog("hideIntroOverlay: overlay hidden");
   } else {
-    debugLog("hideSetupOverlay: overlay element NOT FOUND");
+    debugLog("hideIntroOverlay: overlay element NOT FOUND");
   }
 }
 
-// Attempt to close the setup wizard. If the user hasn't provided an API token
+// Attempt to close the intro wizard. If the user hasn't provided an API token
 // yet, show a warning on the first attempt and keep the wizard open. A second
-// attempt (or an existing token) closes it freely.
-function attemptCloseSetup() {
-  const warningEl = document.getElementById("setup_warning");
-  if (warningEl && !getToken() && warningEl.hidden) {
-    warningEl.textContent = t("setupCloseWarning");
+// attempt (or an existing token) closes it freely. When the wizard was opened
+// from Settings (introReopenMode), closing is always free.
+function attemptCloseIntro() {
+  const warningEl = document.getElementById("intro_warning");
+  if (warningEl && !introReopenMode && !getToken() && warningEl.hidden) {
+    warningEl.textContent = t("introCloseWarning");
     warningEl.hidden = false;
     return;
   }
-  hideSetupOverlay();
+  hideIntroOverlay();
 }
 
-// Wire up the setup close (X) button so users can exit the wizard.
-const setupCloseBtn = document.getElementById("setup_close_btn");
-if (setupCloseBtn) {
-  setupCloseBtn.addEventListener("click", attemptCloseSetup);
+// Wire up the intro close (X) button so users can exit the wizard.
+const introCloseBtn = document.getElementById("intro_close_btn");
+if (introCloseBtn) {
+  introCloseBtn.addEventListener("click", attemptCloseIntro);
 }
 
-// Arrow key shortcuts for the setup wizard (left = back, right = next)
+// Arrow key shortcuts for the intro wizard (left = back, right = next)
 document.addEventListener("keydown", (event) => {
-  const overlay = document.getElementById("setup_overlay");
+  const overlay = document.getElementById("intro_overlay");
   if (!overlay || overlay.hidden) return;
   // Don't steal arrow keys while the user is typing in an input
   if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA" || event.target.isContentEditable) return;
@@ -3934,24 +4627,24 @@ document.addEventListener("keydown", (event) => {
   if (document.querySelector(".token_settings_modal:not([hidden])")) return;
 
   if (event.key === "Escape") {
-    attemptCloseSetup();
+    attemptCloseIntro();
   } else if (event.key === "ArrowLeft") {
     event.preventDefault();
     // Find the current step index from the step indicator
-    const indicator = document.querySelector(".setup_step_indicator");
+    const indicator = document.querySelector(".intro_step_indicator");
     if (indicator) {
       const currentStep = Number(indicator.getAttribute("data-step")) - 1;
       if (currentStep > 0) {
-        renderSetupStep(currentStep - 1);
+        renderIntroStep(currentStep - 1);
       }
     }
   } else if (event.key === "ArrowRight") {
     event.preventDefault();
-    const indicator = document.querySelector(".setup_step_indicator");
+    const indicator = document.querySelector(".intro_step_indicator");
     if (indicator) {
       const currentStep = Number(indicator.getAttribute("data-step")) - 1;
-      if (currentStep < SETUP_STEPS.length - 1) {
-        renderSetupStep(currentStep + 1);
+      if (currentStep < INTRO_STEPS.length - 1) {
+        renderIntroStep(currentStep + 1);
       }
     }
   }
@@ -4055,11 +4748,11 @@ function removeModal(modal) {
 }
 
 // Adds a top-right X close button to a modal's content element. The button
-// reuses the same styling as the setup wizard's close button for consistency.
+// reuses the same styling as the intro wizard's close button for consistency.
 function addModalCloseButton(content, onClose) {
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
-  closeBtn.className = "setup_close_btn";
+  closeBtn.className = "intro_close_btn";
   closeBtn.setAttribute("aria-label", "Close");
   closeBtn.textContent = "✕";
   closeBtn.addEventListener("click", onClose);
@@ -4126,13 +4819,13 @@ function openTermsModal() {
   const header = modal.querySelector(".tc_header_sticky");
   if (header) {
     // Remove any existing close button first
-    const existingClose = header.querySelector(".setup_close_btn");
+    const existingClose = header.querySelector(".intro_close_btn");
     if (existingClose) existingClose.remove();
     
     // Create close button with proper event handling
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
-    closeBtn.className = "setup_close_btn";
+    closeBtn.className = "intro_close_btn";
     closeBtn.setAttribute("aria-label", "Close");
     closeBtn.textContent = "✕";
     closeBtn.addEventListener("click", (e) => {
@@ -4159,10 +4852,10 @@ function openTermsModal() {
 // ── Settings Menu Modal ────────────────────────────────────────
 
 function openSettingsMenu() {
-  // Close setup overlay if it's open to prevent overlap
-  const setupOverlay = document.getElementById("setup_overlay");
-  if (setupOverlay && !setupOverlay.hidden) {
-    setupOverlay.hidden = true;
+  // Close intro overlay if it's open to prevent overlap
+  const introOverlay = document.getElementById("intro_overlay");
+  if (introOverlay && !introOverlay.hidden) {
+    introOverlay.hidden = true;
   }
 
   const existing = document.getElementById("settings_menu_modal");
@@ -4191,11 +4884,11 @@ function openSettingsMenu() {
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
       </svg>
     </span>
-    <span class="settings_menu_label">${t("settingsApiToken")}</span>
+    <span class="settings_menu_label">${t("settingsConnect")}</span>
   `;
   apiOption.addEventListener("click", () => {
     removeModal(modal);
-    openTokenSettings();
+    showIntroOverlay(true);
   });
   content.appendChild(apiOption);
 
@@ -4217,6 +4910,44 @@ function openSettingsMenu() {
   });
   content.appendChild(feedbackOption);
 
+  // Split View toggle
+  const splitOption = document.createElement("div");
+  splitOption.className = "settings_menu_option settings_menu_toggle_row";
+  splitOption.innerHTML = `
+    <span class="settings_menu_icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="12" y1="3" x2="12" y2="21"></line>
+      </svg>
+    </span>
+    <span class="settings_menu_label_text">
+      <span class="settings_menu_label">${t("settingsSplitView")}</span>
+      <span class="settings_menu_desc">${t("settingsSplitViewDesc")}</span>
+    </span>
+    <label class="toggle_switch">
+      <input type="checkbox" id="settings_split_toggle" ${splitViewEnabled ? "checked" : ""}>
+      <span class="toggle_slider"></span>
+    </label>
+  `;
+  const splitToggle = splitOption.querySelector("#settings_split_toggle");
+  splitToggle.addEventListener("change", () => {
+    splitViewEnabled = splitToggle.checked;
+    storageSet("splitView", String(splitViewEnabled));
+    if (splitViewEnabled) {
+      enableSplitView();
+    } else {
+      disableSplitView();
+    }
+  });
+  // Prevent the row click from toggling the checkbox twice
+  splitOption.addEventListener("click", (e) => {
+    if (e.target !== splitToggle && !e.target.classList.contains("toggle_slider")) {
+      splitToggle.checked = !splitToggle.checked;
+      splitToggle.dispatchEvent(new Event("change"));
+    }
+  });
+  content.appendChild(splitOption);
+
   addModalCloseButton(content, () => removeModal(modal));
 
   modal.appendChild(content);
@@ -4228,146 +4959,6 @@ function openSettingsMenu() {
 
   document.body.appendChild(modal);
   setTimeout(() => modal.focus(), 0);
-}
-
-// ── Token Management Modal ─────────────────────────────────────
-
-function openTokenSettings() {
-  const existing = document.getElementById("token_settings_modal");
-  if (existing) existing.remove();
-
-  const modal = document.createElement("div");
-  modal.id = "token_settings_modal";
-  modal.className = "token_settings_modal";
-  prepareModal(modal);
-
-  const content = document.createElement("div");
-  content.className = "token_settings_content";
-
-  const title = document.createElement("h2");
-  title.textContent = t("tokenSettings");
-  content.appendChild(title);
-
-  const ageDays = getTokenAgeDays();
-  if (ageDays !== null) {
-    const ageP = document.createElement("p");
-    ageP.className = "token_settings_info";
-    ageP.textContent = t("tokenAge").replace("{days}", String(Math.round(ageDays)));
-    content.appendChild(ageP);
-  }
-
-  // Token input field
-  const inputGroup = document.createElement("div");
-  inputGroup.className = "setup_token_group";
-  inputGroup.style.marginTop = "8px";
-
-  const input = document.createElement("input");
-  input.type = "password";
-  input.id = "settings_token_input";
-  input.className = "setup_token_input";
-  input.placeholder = t("setupTokenPlaceholder");
-  input.autocomplete = "off";
-  input.spellcheck = false;
-  // Leave empty for security - don't pre-fill existing token
-  inputGroup.appendChild(input);
-
-  // Show/hide toggle button
-  const toggleBtn = document.createElement("button");
-  toggleBtn.type = "button";
-  toggleBtn.className = "token_toggle_btn";
-  toggleBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye-slash" viewBox="0 0 16 16"><path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z"/><path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829"/><path d="M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12-1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z"/></svg>`;
-  toggleBtn.setAttribute("aria-label", "Toggle token visibility");
-  toggleBtn.addEventListener("click", () => {
-    const isPassword = input.type === "password";
-    input.type = isPassword ? "text" : "password";
-    toggleBtn.innerHTML = isPassword
-      ? `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/></svg>`
-      : `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye-slash" viewBox="0 0 16 16"><path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z"/><path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829"/><path d="M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12-1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z"/></svg>`;
-  });
-  inputGroup.appendChild(toggleBtn);
-
-    // Message area - hidden by default, shown when an error/success/info message is set
-    const msg = document.createElement("p");
-    msg.id = "settings_token_message";
-    msg.className = "setup_message";
-    msg.hidden = true;
-    content.appendChild(msg);
-
-  const validateBtn = document.createElement("button");
-  validateBtn.type = "button";
-  validateBtn.className = "setup_validate_btn";
-  validateBtn.textContent = t("setupValidate");
-  validateBtn.addEventListener("click", async () => {
-    const token = input.value.trim();
-    if (!token) {
-      msg.textContent = t("setupError");
-      msg.className = "setup_message setup_message_error";
-      msg.hidden = false;
-      return;
-    }
-
-    validateBtn.disabled = true;
-    msg.textContent = t("setupValidating");
-    msg.className = "setup_message setup_message_info";
-    msg.hidden = false;
-
-    try {
-      const csrfToken = await getCsrfToken();
-      const response = await fetch("/api/validate-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
-        body: JSON.stringify({ token }),
-      });
-      const data = await response.json();
-
-      if (data.valid) {
-        saveToken(token);
-        msg.textContent = t("setupSuccess");
-        msg.className = "setup_message setup_message_success";
-        setTimeout(() => {
-          removeModal(modal);
-          reinitializeApp();
-        }, 1000);
-      } else {
-        msg.textContent = data.message || t("setupError");
-        msg.className = "setup_message setup_message_error";
-        validateBtn.disabled = false;
-      }
-    } catch (err) {
-      msg.textContent = t("setupError");
-      msg.className = "setup_message setup_message_error";
-      validateBtn.disabled = false;
-    }
-  });
-  inputGroup.appendChild(validateBtn);
-
-  content.appendChild(inputGroup);
-
-  // "Need a token?" link to open the tutorial wizard
-  const needTokenBtn = document.createElement("button");
-  needTokenBtn.type = "button";
-  needTokenBtn.className = "setup_skip_btn";
-  needTokenBtn.textContent = t("setupTokenHelp");
-  needTokenBtn.style.marginTop = "4px";
-  needTokenBtn.addEventListener("click", () => {
-    removeModal(modal);
-    showSetupOverlay();
-  });
-  content.appendChild(needTokenBtn);
-
-  addModalCloseButton(content, () => removeModal(modal));
-
-  modal.appendChild(content);
-
-  // Close on backdrop click
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) removeModal(modal);
-  });
-
-  document.body.appendChild(modal);
-
-  // Focus the input
-  setTimeout(() => input.focus(), 100);
 }
 
 // ── Feedback Form ─────────────────────────────────────────────
@@ -4503,33 +5094,33 @@ function openFeedbackForm() {
   // Message area (hidden by default, shown when an error/success/info message is set)
   const feedbackMsg = document.createElement("p");
   feedbackMsg.id = "feedback_message";
-  feedbackMsg.className = "setup_message";
+  feedbackMsg.className = "intro_message";
   feedbackMsg.hidden = true;
   content.appendChild(feedbackMsg);
 
   // Submit button
   const submitBtn = document.createElement("button");
   submitBtn.type = "button";
-  submitBtn.className = "setup_validate_btn";
+  submitBtn.className = "intro_validate_btn";
   submitBtn.style.width = "100%";
   submitBtn.style.marginTop = "8px";
   submitBtn.textContent = t("feedbackSubmit");
   submitBtn.addEventListener("click", async () => {
     if (selectedRating === 0) {
       feedbackMsg.textContent = t("feedbackValidationRating");
-      feedbackMsg.className = "setup_message setup_message_error";
+      feedbackMsg.className = "intro_message intro_message_error";
       feedbackMsg.hidden = false;
       return;
     }
     if (!selectedUsage) {
       feedbackMsg.textContent = t("feedbackValidationUsage");
-      feedbackMsg.className = "setup_message setup_message_error";
+      feedbackMsg.className = "intro_message intro_message_error";
       feedbackMsg.hidden = false;
       return;
     }
     if (!selectedRecommend) {
       feedbackMsg.textContent = t("feedbackValidationRecommend");
-      feedbackMsg.className = "setup_message setup_message_error";
+      feedbackMsg.className = "intro_message intro_message_error";
       feedbackMsg.hidden = false;
       return;
     }
@@ -4537,7 +5128,7 @@ function openFeedbackForm() {
     submitBtn.disabled = true;
     submitBtn.textContent = t("feedbackSubmitting");
     feedbackMsg.textContent = "";
-    feedbackMsg.className = "setup_message";
+    feedbackMsg.className = "intro_message";
     feedbackMsg.hidden = true;
 
     try {
@@ -4559,21 +5150,21 @@ function openFeedbackForm() {
 
       if (data.success) {
         feedbackMsg.textContent = t("feedbackSuccess");
-        feedbackMsg.className = "setup_message setup_message_success";
+        feedbackMsg.className = "intro_message intro_message_success";
         feedbackMsg.hidden = false;
         submitBtn.textContent = t("feedbackSubmit");
         submitBtn.disabled = true;
         setTimeout(() => removeModal(modal), 2000);
       } else {
         feedbackMsg.textContent = data.message || t("feedbackError");
-        feedbackMsg.className = "setup_message setup_message_error";
+        feedbackMsg.className = "intro_message intro_message_error";
         feedbackMsg.hidden = false;
         submitBtn.disabled = false;
         submitBtn.textContent = t("feedbackSubmit");
       }
     } catch (err) {
       feedbackMsg.textContent = t("feedbackError");
-      feedbackMsg.className = "setup_message setup_message_error";
+      feedbackMsg.className = "intro_message intro_message_error";
       feedbackMsg.hidden = false;
       submitBtn.disabled = false;
       submitBtn.textContent = t("feedbackSubmit");
@@ -4617,30 +5208,47 @@ window.addEventListener("unhandledrejection", (event) => {
   if (event.reason && event.reason.name === "AbortError") return;
 });
 
-document.addEventListener("DOMContentLoaded", () => {
+async function checkAuthStatus() {
+  try {
+    const res = await fetch("/auth/status");
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.authenticated || false;
+  } catch (err) {
+    debugLog("checkAuthStatus: failed", err);
+    return false;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
   // Setup overlay
-  const overlay = document.getElementById("setup_overlay");
+  const overlay = document.getElementById("intro_overlay");
   let showingSetup = false;
   if (overlay) {
-    // Close setup overlay when "skip" is clicked and open settings modal
-    const skipBtn = document.getElementById("setup_skip_btn");
-    if (skipBtn) {
-      skipBtn.addEventListener("click", () => {
-        overlay.hidden = true;
-        openSettingsMenu();
-      });
-    }
+    // Determine whether we need to show the wizard. Three cases:
+    //  1. PAT in localStorage → skip wizard (direct load)
+    //  2. OAuth session active  → skip wizard (server session valid)
+    //  3. Neither               → show wizard
+    const hasLocalToken = !!getToken();
+    const hasOAuthSession = !hasLocalToken ? await checkAuthStatus() : false;
+    const hasOAuthErrorParam = new URLSearchParams(window.location.search).has("oauth_error");
 
-    // If no token, show the setup overlay
-    if (!getToken()) {
-      showSetupOverlay();
+    if (!hasLocalToken && !hasOAuthSession || hasOAuthErrorParam) {
+      showIntroOverlay();
       showingSetup = true;
     }
   }
 
   // Only start the app if we have a token (overlay not shown)
   if (!showingSetup) {
-    const initialView = new URLSearchParams(window.location.search).get("view")
+    const urlParams = new URLSearchParams(window.location.search);
+    // Clean residual OAuth redirect params from the URL bar (no reload)
+    if (urlParams.has("oauth_success")) {
+      urlParams.delete("oauth_success");
+      const qs = urlParams.toString();
+      window.history.replaceState({}, "", qs ? `?${qs}` : window.location.pathname);
+    }
+    const initialView = urlParams.get("view")
       || storageGet("selectedView")
       || "work";
     // Mark that the initial load should bust cache for fresh completion data
@@ -4737,6 +5345,12 @@ if (languageToggle) {
 }
 
 renderAll();
+
+// ── Restore Split View on Load ─────────────────────────────────
+if (splitViewEnabled) {
+  // Enable split view after initial render completes
+  setTimeout(() => enableSplitView(), 0);
+}
 
 // ── Service Worker Registration ────────────────────────────────
 if ('serviceWorker' in navigator) {
