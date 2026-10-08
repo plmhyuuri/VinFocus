@@ -28,7 +28,7 @@ from session_store import init_session_store, get_session, update_session_tokens
 
 load_dotenv()
 
-VINFOCUS_SCRIPT_VERSION = "1.9.0"
+VINFOCUS_SCRIPT_VERSION = "1.10.2"
 
 # Configure logging
 logging.basicConfig(

@@ -321,6 +321,8 @@ introOAuthErrorUnknown: "An unknown error occurred during authorization.",
     footerFeedback: "I appreciate any reviews or feedbacks towards this project.",
     footerCopyright: "© 2026 VinFocus",
     settingsTitle: "Settings",
+    settingsAccount: "Account",
+    settingsPreferences: "Preferences",
     settingsConnect: "Sign in to Canvas",
     settingsFeedback: "Send Feedback",
     settingsSplitView: "Split View",
@@ -566,6 +568,8 @@ introOAuthErrorUnknown: "Đã xảy ra lỗi không xác định khi cấp quy�
     footerFeedback: "Mình rất trân trọng mọi đánh giá và phản hồi về dự án này.",
     footerCopyright: "© 2026 VinFocus",
     settingsTitle: "Cài Đặt",
+    settingsAccount: "Tài khoản",
+    settingsPreferences: "Tùy chọn",
     settingsConnect: "Đăng nhập Canvas",
     settingsFeedback: "Gửi Phản Hồi",
     settingsSplitView: "Chia đôi màn hình",
@@ -4869,9 +4873,26 @@ function openSettingsMenu() {
   const content = document.createElement("div");
   content.className = "token_settings_content";
 
+  const header = document.createElement("div");
+  header.className = "settings_header";
   const title = document.createElement("h2");
   title.textContent = t("settingsTitle");
-  content.appendChild(title);
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "settings_header_close";
+  closeBtn.setAttribute("aria-label", "Close");
+  closeBtn.textContent = "✕";
+  closeBtn.addEventListener("click", () => removeModal(modal));
+  header.appendChild(title);
+  header.appendChild(closeBtn);
+  content.appendChild(header);
+
+  // ACCOUNT group
+  const accountGroup = document.createElement("div");
+  accountGroup.className = "settings_group";
+  const accountLabel = document.createElement("p");
+  accountLabel.className = "settings_group_label";
+  accountLabel.textContent = t("settingsAccount");
 
   // API Token option
   const apiOption = document.createElement("button");
@@ -4885,30 +4906,22 @@ function openSettingsMenu() {
       </svg>
     </span>
     <span class="settings_menu_label">${t("settingsConnect")}</span>
+    <span class="settings_chevron" aria-hidden="true">›</span>
   `;
   apiOption.addEventListener("click", () => {
     removeModal(modal);
     showIntroOverlay(true);
   });
-  content.appendChild(apiOption);
+  accountGroup.appendChild(accountLabel);
+  accountGroup.appendChild(apiOption);
+  content.appendChild(accountGroup);
 
-  // Feedback option
-  const feedbackOption = document.createElement("button");
-  feedbackOption.type = "button";
-  feedbackOption.className = "settings_menu_option";
-  feedbackOption.innerHTML = `
-    <span class="settings_menu_icon">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-      </svg>
-    </span>
-    <span class="settings_menu_label">${t("settingsFeedback")}</span>
-  `;
-  feedbackOption.addEventListener("click", () => {
-    removeModal(modal);
-    openFeedbackForm();
-  });
-  content.appendChild(feedbackOption);
+  // PREFERENCES group
+  const prefsGroup = document.createElement("div");
+  prefsGroup.className = "settings_group";
+  const prefsLabel = document.createElement("p");
+  prefsLabel.className = "settings_group_label";
+  prefsLabel.textContent = t("settingsPreferences");
 
   // Split View toggle
   const splitOption = document.createElement("div");
@@ -4946,9 +4959,28 @@ function openSettingsMenu() {
       splitToggle.dispatchEvent(new Event("change"));
     }
   });
-  content.appendChild(splitOption);
+  prefsGroup.appendChild(prefsLabel);
+  prefsGroup.appendChild(splitOption);
+  content.appendChild(prefsGroup);
 
-  addModalCloseButton(content, () => removeModal(modal));
+  // Divider
+  const divider = document.createElement("div");
+  divider.className = "settings_divider";
+  content.appendChild(divider);
+
+  // Feedback option (iconless)
+  const feedbackOption = document.createElement("button");
+  feedbackOption.type = "button";
+  feedbackOption.className = "settings_menu_option";
+  feedbackOption.innerHTML = `
+    <span class="settings_menu_label">${t("settingsFeedback")}</span>
+    <span class="settings_chevron" aria-hidden="true">›</span>
+  `;
+  feedbackOption.addEventListener("click", () => {
+    removeModal(modal);
+    openFeedbackForm();
+  });
+  content.appendChild(feedbackOption);
 
   modal.appendChild(content);
 

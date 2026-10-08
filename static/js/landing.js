@@ -270,12 +270,11 @@
     }, 30);
   }
 
-  document.querySelectorAll(".hero_title, .hero_desc, .hero_actions, .hero_kbd, .hero_shot")
+  document.querySelectorAll(".hero_title, .hero_desc, .hero_kbd, .hero_shot")
     .forEach(function (el) {
       var map = {
         "hero_title": "hero_load_title",
         "hero_desc": "hero_load_desc",
-        "hero_actions": "hero_load_actions",
         "hero_kbd": "hero_load_kbd",
         "hero_shot": "hero_load_shot"
       };
@@ -294,7 +293,6 @@
       hero_eyebrow: "vinfocus --view this-week",
       hero_title: "Browse Canvas. Not the clutter.",
       hero_desc: "A faster way through Vinschool's Canvas LMS.<br>Everything from Canvas, nothing in your way.",
-      hero_launch: "Launch App",
       hero_kbd: "navigate sections",
       hero_status_courses: "courses",
       hero_status_weeks: "weeks",
@@ -358,7 +356,6 @@
       hero_eyebrow: "vinfocus --view this-week",
       hero_title: "Lướt Canvas. Không rối rắm.",
       hero_desc: "Một cách nhanh gọn hơn để dùng Canvas LMS của Vinschool.<br>Tất cả từ Canvas. Tập trung vào điều quan trọng nhất.",
-      hero_launch: "Mở ứng dụng",
       hero_kbd: "điều hướng các phần",
       hero_status_courses: "khóa học",
       hero_status_weeks: "tuần",

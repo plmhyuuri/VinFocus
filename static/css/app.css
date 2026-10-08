@@ -3521,6 +3521,91 @@ body.light .intro_step_note {
     font-weight: 400;
 }
 
+/* ── Settings Menu Grouped Layout ─────────────────────────── */
+
+#settings_menu_modal .token_settings_content {
+    max-width: 430px;
+    gap: 0;
+    text-align: start;
+}
+
+.settings_header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.settings_header_close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--border-pill);
+    border-radius: var(--radius-sm);
+    background: var(--bg-pill);
+    color: var(--text-muted-strong);
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.settings_header_close:hover {
+    background: var(--bg-pill-hover);
+    border-color: var(--border-pill-hover);
+    color: var(--text-primary);
+}
+
+.settings_group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.settings_group + .settings_group {
+    margin-top: 24px;
+}
+
+.settings_group_label {
+    margin: 0;
+    padding: 0 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.settings_chevron {
+    flex-shrink: 0;
+    margin-left: 12px;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    font-weight: 400;
+    line-height: 1;
+    transition: color 0.15s ease;
+}
+
+.settings_menu_option:hover .settings_chevron {
+    color: var(--text-primary);
+}
+
+.settings_menu_option .settings_menu_label {
+    display: flex;
+    align-items: center;
+}
+
+.settings_divider {
+    height: 1px;
+    margin: 24px 0 20px;
+    background: var(--border-secondary);
+    border: none;
+}
+
 /* ── Toggle Switch ──────────────────────────────────────────── */
 
 .toggle_switch {

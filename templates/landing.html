@@ -28,6 +28,7 @@
     <meta name="twitter:image" content="https://vinfocus.onrender.com/static/images/landing.png">
 
     <title>VinFocus - Canvas Dashboard for Vinschool Students</title>
+    <link rel="preload" as="image" href="/static/images/img_mockup.png" fetchpriority="high">
     <link rel="preload" as="image" href="/static/images/timetable.png" fetchpriority="high">
     <link rel="preload" as="image" href="/static/images/setup-wizard.png" fetchpriority="high">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
@@ -77,18 +78,17 @@
         <p class="eyebrow hero_eyebrow" id="hero_prompt" aria-hidden="false">
             <span class="eyebrow_prompt">$</span><span id="hero_prompt_text" data-i18n="hero_eyebrow">vinfocus --view this-week</span><span class="hero_caret" aria-hidden="true"></span>
         </p>
-        <h1 class="hero_title" data-i18n="hero_title">VinFocus: Canvas Dashboard for Vinschool students</h1>
+        <h1 class="hero_title" data-i18n="hero_title">Browse Canvas. Not the clutter.</h1>
         <p class="hero_desc" data-i18n="hero_desc">
             A faster way through Vinschool's Canvas LMS. Everything from Canvas, nothing in your way.
         </p>
-        <div class="hero_actions">
-            <a href="/app" class="btn btn_primary" data-i18n="hero_launch">Launch App</a>
-        </div>
         <p class="hero_kbd" aria-hidden="true"><span class="hero_kbd_keys">[j] [k]</span> <span data-i18n="hero_kbd">navigate sections</span></p>
     </div>
-    <div class="hero_shot">
-        <img src="/static/images/work-view.png" alt="VinFocus course browser showing week navigation, course pills, search bar, and an item list organized by type with completion badges" class="hero_screenshot" loading="eager">
-    </div>
+     <div class="hero_shot">
+         <div class="hero_mockup">
+             <img src="/static/images/img_mockup.png" alt="The VinFocus dashboard open on a laptop sat on a dark desk beside a mouse and coffee mug" class="hero_screenshot" loading="eager" width="1920" height="864">
+         </div>
+     </div>
 
     <div class="status_strip" aria-label="Product scale">
         <span class="status_item"><b>20+</b> <span class="status_label" data-i18n="hero_status_courses">courses</span></span>
