@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="A cleaner dashboard for Vinschool's Canvas LMS. Browse assignments, courses, and schedules faster with VinFocus.">
+    <meta name="description" content="VinFocus — a cleaner dashboard for Vinschool's Canvas LMS. An archived student project, not publicly available.">
     <meta name="theme-color" content="#ffffff">
     <link rel="icon" type="image/png" href="/static/images/favicon-96x96.png?v=1" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg?v=1" />
@@ -14,7 +14,7 @@
     <link rel="canonical" href="https://vinfocus.study">
 
     <meta property="og:title" content="VinFocus">
-    <meta property="og:description" content="Browse Canvas. Not the clutter.">
+    <meta property="og:description" content="Browse Canvas. Not the clutter. Archived student project — not publicly available.">
     <meta property="og:image" content="https://vinfocus.onrender.com/static/images/landing.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
@@ -24,7 +24,7 @@
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="VinFocus">
-    <meta name="twitter:description" content="Browse Canvas. Not the clutter.">
+    <meta name="twitter:description" content="Browse Canvas. Not the clutter. Archived student project — not publicly available.">
     <meta name="twitter:image" content="https://vinfocus.onrender.com/static/images/landing.png">
 
     <title>VinFocus - Canvas Dashboard for Vinschool Students</title>
@@ -82,6 +82,9 @@
         <p class="hero_desc" data-i18n="hero_desc">
             A faster way through Vinschool's Canvas LMS. Everything from Canvas, nothing in your way.
         </p>
+        <p class="hero_notice" data-i18n="hero_notice">
+            <span class="hero_notice_dot" aria-hidden="true"></span>Not publicly available — an archived student project. Vinschool IT declined the developer key needed for public login; the hosted demo is offline.
+        </p>
         <p class="hero_kbd" aria-hidden="true"><span class="hero_kbd_keys">[j] [k]</span> <span data-i18n="hero_kbd">navigate sections</span></p>
     </div>
      <div class="hero_shot">
@@ -90,7 +93,8 @@
          </div>
      </div>
 
-    <div class="status_strip" aria-label="Product scale">
+    <div class="status_strip" aria-label="Designed capacity">
+        <span class="status_prefix" data-i18n="hero_status_prefix">Built to handle</span>
         <span class="status_item"><b>20+</b> <span class="status_label" data-i18n="hero_status_courses">courses</span></span>
         <span class="status_sep">/</span>
         <span class="status_item"><b>400+</b> <span class="status_label" data-i18n="hero_status_weeks">weeks</span></span>
@@ -224,6 +228,15 @@
         <h2 class="section_title" data-i18n="faq_title">Frequently asked questions</h2>
         <p class="section_subtitle" data-i18n="faq_subtitle">Quick answers to common questions.</p>
         <div class="faq_list">
+            <div class="faq_item">
+                <button class="faq_question" aria-expanded="false">
+                    <span data-i18n="faq_available_q">Can I use VinFocus?</span>
+                    <svg class="faq_chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+                <div class="faq_answer">
+                    <p data-i18n="faq_available_a">Not publicly. VinFocus is an archived student project and the hosted demo is offline. A public sign-in would have required a Canvas developer key that Vinschool IT declined to issue. The code is open on GitHub and you can run it locally with your own Canvas API token.</p>
+                </div>
+            </div>
             <div class="faq_item">
                 <button class="faq_question" aria-expanded="false">
                     <span data-i18n="faq1_q">Is VinFocus an official Vinschool product?</span>

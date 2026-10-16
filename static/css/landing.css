@@ -616,6 +616,31 @@ a {
     margin: 0 auto 14px;
 }
 
+.hero_notice {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 62ch;
+    margin: 0 auto 14px;
+    padding: 6px 14px;
+    border: 1px solid var(--hero-line);
+    border-radius: 12px;
+    background: rgba(76, 141, 255, 0.08);
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--hero-ink-2);
+    text-align: left;
+}
+
+.hero_notice_dot {
+    flex: 0 0 auto;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--hero-blue);
+    box-shadow: 0 0 0 3px rgba(76, 141, 255, 0.18);
+}
+
 .hero_kbd {
     margin-top: 6px;
     font-size: 0.72rem;
@@ -673,6 +698,11 @@ a {
 .status_item b {
     color: var(--hero-ink);
     font-weight: 700;
+}
+
+.status_prefix {
+    color: var(--hero-ink-3);
+    letter-spacing: 0.02em;
 }
 
 .status_sep {

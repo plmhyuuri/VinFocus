@@ -284,26 +284,14 @@ const TRANSLATIONS = {
     notInClass: "End of the school day",
     introTitle: "Welcome to VinFocus",
     introSubtitle: "Your dashboard for Vinschool Canvas - view courses, track modules, and stay on top of your work.",
-    introCloseWarning: "You haven't signed in yet, so the app can't load your course data. To connect later, open Settings (the gear icon) and choose Sign in to Canvas.",
+    introCloseWarning: "You haven't saved a token yet, so the app can't load your course data. To add one later, open Settings (the gear icon) and choose Set API token.",
     introStep: "Step",
     introOf: "of",
     introNext: "Next",
     introPrev: "Back",
     introFinish: "Finish",
-introChooseTitle: "How would you like to connect?",
-introChooseDesc: "OAuth is recommended - it's more secure and tokens auto-refresh. Manual tokens expire every 4 months.",
-introTabOAuth: "OAuth (Recommended)",
-introTabManual: "Manual Token (Legacy)",
-introOAuthTitle: "Connect with Canvas",
-introOAuthDesc: "Click below to securely authorize VinFocus. You'll be redirected to Canvas to approve access.",
-introOAuthConnect: "Connect with Canvas",
-introOAuthUnavailable: "OAuth is not configured in this environment.",
-introManualTitle: "Use Manual Access Token",
-introManualDesc: "Paste a Personal Access Token from Canvas Settings → Approved Integrations.",
-introOAuthErrorAccessDenied: "Canvas authorization was cancelled.",
-introOAuthErrorInvalidRequest: "The Canvas authorization request was invalid.",
-introOAuthErrorServerError: "Canvas couldn't complete the authorization.",
-introOAuthErrorUnknown: "An unknown error occurred during authorization.",
+introChooseTitle: "Connect to Canvas",
+introChooseDesc: "Paste a Personal Access Token from Canvas Settings → Approved Integrations. Tokens expire every 4 months.",
     introTokenLabel: "Paste your API token here",
     introTokenPlaceholder: "Paste API token…",
     introValidate: "Validate & Save",
@@ -323,7 +311,7 @@ introOAuthErrorUnknown: "An unknown error occurred during authorization.",
     settingsTitle: "Settings",
     settingsAccount: "Account",
     settingsPreferences: "Preferences",
-    settingsConnect: "Sign in to Canvas",
+    settingsConnect: "Set API token",
     settingsFeedback: "Send Feedback",
     settingsSplitView: "Split View",
     settingsSplitViewDesc: "Compare two courses side by side",
@@ -531,26 +519,14 @@ introOAuthErrorUnknown: "An unknown error occurred during authorization.",
     notInClass: "Kết thúc ngày học",
     introTitle: "Chào mừng đến với VinFocus",
     introSubtitle: "Bảng điều khiển Vinschool Canvas của bạn - xem khóa học, theo dõi modules và luôn cập nhật bài vở.",
-    introCloseWarning: "Bạn chưa đăng nhập, nên ứng dụng không thể tải dữ liệu khóa học của bạn. Để kết nối sau, hãy mở Cài Đặt (biểu tượng bánh răng) và chọn Đăng nhập Canvas.",
+    introCloseWarning: "Bạn chưa lưu mã truy cập, nên ứng dụng không thể tải dữ liệu khóa học của bạn. Để thêm sau, hãy mở Cài Đặt (biểu tượng bánh răng) và chọn Đặt mã API.",
     introStep: "Bước",
     introOf: "trên",
     introNext: "Tiếp theo",
     introPrev: "Quay lại",
     introFinish: "Hoàn tất",
-introChooseTitle: "Bạn muốn kết nối như thế nào?",
-introChooseDesc: "OAuth được khuyến nghị - an toàn hơn và token tự động làm mới. Mã thủ công hết hạn sau 4 tháng.",
-introTabOAuth: "OAuth (Khuyến nghị)",
-introTabManual: "Mã Thủ Công (Cũ)",
-introOAuthTitle: "Kết Nối với Canvas",
-introOAuthDesc: "Nhấn bên dưới để cấp quyền an toàn cho VinFocus. Bạn sẽ được chuyển đến Canvas để phê duyệt.",
-introOAuthConnect: "Kết Nối với Canvas",
-introOAuthUnavailable: "OAuth chưa được cấu hình trong môi trường này.",
-introManualTitle: "Sử Dụng Mã Truy Cập Thủ Công",
-introManualDesc: "Dán Mã Truy Cập Cá Nhân từ Canvas Settings → Tích Hợp Được Phê Duyệt.",
-introOAuthErrorAccessDenied: "Việc cấp quyền Canvas đã bị hủy.",
-introOAuthErrorInvalidRequest: "Yêu cầu cấp quyền Canvas không hợp lệ.",
-introOAuthErrorServerError: "Canvas không thể hoàn tất việc cấp quyền.",
-introOAuthErrorUnknown: "Đã xảy ra lỗi không xác định khi cấp quyền.",
+introChooseTitle: "Kết nối với Canvas",
+introChooseDesc: "Dán Mã Truy Cập Cá Nhân từ Canvas Settings → Tích Hợp Được Phê Duyệt. Mã hết hạn sau 4 tháng.",
     introTokenLabel: "Dán mã API của bạn vào đây",
     introTokenPlaceholder: "Dán mã API…",
     introValidate: "Xác thực & Lưu",
@@ -570,7 +546,7 @@ introOAuthErrorUnknown: "Đã xảy ra lỗi không xác định khi cấp quy�
     settingsTitle: "Cài Đặt",
     settingsAccount: "Tài khoản",
     settingsPreferences: "Tùy chọn",
-    settingsConnect: "Đăng nhập Canvas",
+    settingsConnect: "Đặt mã API",
     settingsFeedback: "Gửi Phản Hồi",
     settingsSplitView: "Chia đôi màn hình",
     settingsSplitViewDesc: "So sánh hai khóa học cạnh nhau",
@@ -1446,7 +1422,11 @@ const SUBJECT_NAME_TO_KEY = {
   "SINH HỌC" : "BIO",
   "HÓA HỌC" : "CHEM",
   "MĨ THUẬT" : "ART",
-  "ENGLISH (LOCAL TEACHERS)" : "ESL (GVVN)"
+  "ENGLISH (LOCAL TEACHERS)" : "ESL (GVVN)",
+  "ENGLISH (FOREIGN TEACHERS)" : "ESL (GVNN)",
+  "CÔNG NGHỆ" : "TECH",
+  "GIÁO DỤC KINH TẾ VÀ PHÁP LUẬT": "GDKT-PL",
+  "HOẠT ĐỘNG TRẢI NGHIỆM, HƯỚNG NGHIỆP": "CAREER"
 };
 
 function courseSubjectKey(course) {
@@ -4123,28 +4103,15 @@ themeToggle.addEventListener("click", toggleTheme);
 
 // ── Intro Wizard ──────────────────────────────────────────────
 
-// Hybrid intro wizard: two intro steps, then a "choose login method" step with
-// tabs — OAuth (recommended, default) and Manual Token (legacy fallback).
+// Intro wizard: two intro steps, then a final step where the user pastes a
+// manual Canvas Personal Access Token.
 const INTRO_STEPS = [
   { titleKey: "introStep1Title", descKey: "introStep1Desc", image: "/static/images/work-view.png" },
   { titleKey: "introStep2Title", descKey: "introStep2Desc", image: "/static/images/timetable.png" },
   { titleKey: "introChooseTitle", descKey: "introChooseDesc", isChoice: true },
 ];
 
-let introActiveTab = "oauth"; // "oauth" | "manual"
-let introOAuthConfigured = false;
-let introPendingOAuthError = null;
 let introReopenMode = false; // wizard opened from Settings → closing is free
-
-const INTRO_OAUTH_ERROR_KEY_MAP = {
-  access_denied: "introOAuthErrorAccessDenied",
-  invalid_request: "introOAuthErrorInvalidRequest",
-  server_error: "introOAuthErrorServerError",
-};
-
-function introOAuthErrorKey(raw) {
-  return INTRO_OAUTH_ERROR_KEY_MAP[raw] || "introOAuthErrorUnknown";
-}
 
 function renderIntroStep(stepIndex) {
   debugLog("renderIntroStep called, stepIndex:", stepIndex);
@@ -4184,7 +4151,7 @@ function renderIntroStep(stepIndex) {
     dots.appendChild(dot);
   }
 
-  // Final step: choose login method via tabs (OAuth recommended / manual fallback)
+  // Final step: enter a manual Canvas API token
   if (step.isChoice) {
     renderIntroChoiceStep(content, nav, dots, stepIndex);
     content.appendChild(nav);
@@ -4246,51 +4213,13 @@ function renderIntroChoiceStep(content, nav, dots, stepIndex) {
   // Choice description
   const desc = document.createElement("p");
   desc.className = "intro_step_desc";
-  desc.textContent = t(introStepDescKeyForChoice());
+  desc.textContent = t("introChooseDesc");
   content.appendChild(desc);
 
-  // Tab bar: OAuth (default) + Manual Token
-  const tabBar = document.createElement("div");
-  tabBar.className = "intro_tab_bar";
-
-  const oauthTab = document.createElement("button");
-  oauthTab.type = "button";
-  oauthTab.className = "intro_tab_btn intro_tab_oauth";
-  oauthTab.textContent = t("introTabOAuth");
-
-  const manualTab = document.createElement("button");
-  manualTab.type = "button";
-  manualTab.className = "intro_tab_btn intro_tab_manual";
-  manualTab.textContent = t("introTabManual");
-
-  tabBar.append(oauthTab, manualTab);
-  content.appendChild(tabBar);
-
-  // Panels
-  const oauthPanel = document.createElement("div");
-  oauthPanel.className = "intro_tab_panel intro_panel_oauth";
+  // Manual token panel — the only login method now that OAuth is removed.
   const manualPanel = document.createElement("div");
   manualPanel.className = "intro_tab_panel intro_panel_manual";
-  content.append(oauthPanel, manualPanel);
-
-  function setActiveTab(tab) {
-    introActiveTab = tab;
-    const isOauth = tab === "oauth";
-    oauthTab.classList.toggle("intro_tab_active", isOauth);
-    manualTab.classList.toggle("intro_tab_active", !isOauth);
-    oauthPanel.hidden = !isOauth;
-    manualPanel.hidden = isOauth;
-    // Restore focus to the manual token input when switching to that tab
-    if (!isOauth) {
-      setTimeout(() => document.getElementById("intro_token_input")?.focus(), 100);
-    }
-  }
-
-  oauthTab.addEventListener("click", () => setActiveTab("oauth"));
-  manualTab.addEventListener("click", () => setActiveTab("manual"));
-
-  // Build panels
-  renderIntroOAuthPanel(oauthPanel);
+  content.appendChild(manualPanel);
   renderIntroManualTokenPanel(manualPanel);
 
   // Back button only on the choice step
@@ -4305,87 +4234,9 @@ function renderIntroChoiceStep(content, nav, dots, stepIndex) {
 
   // Hide step dots on final step
   dots.style.display = "none";
-
-  // Show the tab chosen by the user (OAuth by default). Any pending OAuth
-  // error is rendered inside the OAuth panel.
-  setActiveTab(introActiveTab);
-}
-
-function introStepDescKeyForChoice() {
-  return "introChooseDesc";
-}
-
-async function renderIntroOAuthPanel(panel) {
-  panel.innerHTML = "";
-
-  // Pending OAuth error (from ?oauth_error= redirect) shown on this panel,
-  // then consumed so it isn't re-shown after the user switches tabs.
-  if (introPendingOAuthError) {
-    const err = document.createElement("p");
-    err.className = "intro_message intro_message_error";
-    err.textContent = introPendingOAuthError;
-    panel.appendChild(err);
-    introPendingOAuthError = null;
-  }
-
-  const title = document.createElement("h3");
-  title.className = "intro_tab_panel_title";
-  title.textContent = t("introOAuthTitle");
-  panel.appendChild(title);
-
-  const info = document.createElement("p");
-  info.className = "intro_step_desc";
-  info.textContent = t("introOAuthDesc");
-  panel.appendChild(info);
-
-  const connectWrap = document.createElement("div");
-  connectWrap.className = "intro_oauth_wrap";
-
-  const connectBtn = document.createElement("button");
-  connectBtn.type = "button";
-  connectBtn.className = "intro_oauth_btn";
-  connectBtn.textContent = t("introOAuthConnect");
-
-  const statusHint = document.createElement("p");
-  statusHint.className = "intro_step_note";
-  statusHint.hidden = true;
-
-  connectWrap.append(connectBtn, statusHint);
-  panel.appendChild(connectWrap);
-
-  // Check whether OAuth is configured server-side before enabling the button.
-  try {
-    const res = await fetch("/auth/config");
-    const data = await res.json();
-    introOAuthConfigured = !!(data && data.oauth_enabled);
-  } catch (err) {
-    debugLog("renderIntroOAuthPanel: /auth/config failed", err.message);
-    introOAuthConfigured = false;
-  }
-
-  if (introOAuthConfigured) {
-    connectBtn.disabled = false;
-    connectBtn.addEventListener("click", () => {
-      window.location.href = "/auth/canvas";
-    });
-  } else {
-    connectBtn.disabled = true;
-    statusHint.hidden = false;
-    statusHint.textContent = t("introOAuthUnavailable");
-  }
 }
 
 function renderIntroManualTokenPanel(panel) {
-  const title = document.createElement("h3");
-  title.className = "intro_tab_panel_title";
-  title.textContent = t("introManualTitle");
-  panel.appendChild(title);
-
-  const info = document.createElement("p");
-  info.className = "intro_step_desc";
-  info.textContent = t("introManualDesc");
-  panel.appendChild(info);
-
   const inputGroup = document.createElement("div");
   inputGroup.className = "intro_token_group";
 
@@ -4543,27 +4394,6 @@ function showIntroOverlay(startAtChoice) {
   // haven't signed in" warning) — the user is already past onboarding.
   introReopenMode = !!startAtChoice;
 
-  // Detect ?oauth_error= / ?oauth_success= query params left by the callback
-  // redirect and surface a safe, user-friendly message in the wizard.
-  const urlParams = new URLSearchParams(window.location.search);
-  const oauthError = urlParams.get("oauth_error");
-  const oauthSuccess = urlParams.get("oauth_success");
-  introPendingOAuthError = null;
-  if (oauthError) {
-    introPendingOAuthError = t(introOAuthErrorKey(oauthError));
-    // Keep the OAuth tab active (default) so the error message is visible
-    // right under the "Connect with Canvas" button.
-    introActiveTab = "oauth";
-  }
-  // Clean the params from the URL bar (no reload) to prevent re-triggering on refresh.
-  if (oauthError || oauthSuccess) {
-    urlParams.delete("oauth_error");
-    urlParams.delete("oauth_success");
-    const qs = urlParams.toString();
-    const clean = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-    window.history.replaceState({}, "", clean);
-  }
-
   const overlay = document.getElementById("intro_overlay");
   if (overlay) {
     overlay.hidden = false;
@@ -4578,10 +4408,9 @@ function showIntroOverlay(startAtChoice) {
     const warningEl = document.getElementById("intro_warning");
     if (warningEl) warningEl.hidden = true;
 
-    // Jump straight to the choice step when re-connecting from Settings; a
-    // pending OAuth error also jumps there so the message is visible. Runs of
-    // the wizard otherwise start at the beginning.
-    const jumpToChoice = startAtChoice || introPendingOAuthError;
+    // Jump straight to the choice step when re-connecting from Settings; runs
+    // of the wizard otherwise start at the beginning.
+    const jumpToChoice = startAtChoice;
     debugLog("showIntroOverlay: overlay unhidden, calling renderIntroStep", jumpToChoice ? INTRO_STEPS.length - 1 : 0);
     renderIntroStep(jumpToChoice ? INTRO_STEPS.length - 1 : 0);
   } else {
@@ -5240,32 +5069,15 @@ window.addEventListener("unhandledrejection", (event) => {
   if (event.reason && event.reason.name === "AbortError") return;
 });
 
-async function checkAuthStatus() {
-  try {
-    const res = await fetch("/auth/status");
-    if (!res.ok) return false;
-    const data = await res.json();
-    return data.authenticated || false;
-  } catch (err) {
-    debugLog("checkAuthStatus: failed", err);
-    return false;
-  }
-}
-
 document.addEventListener("DOMContentLoaded", async () => {
   // Setup overlay
   const overlay = document.getElementById("intro_overlay");
   let showingSetup = false;
   if (overlay) {
-    // Determine whether we need to show the wizard. Three cases:
-    //  1. PAT in localStorage → skip wizard (direct load)
-    //  2. OAuth session active  → skip wizard (server session valid)
-    //  3. Neither               → show wizard
+    // Show the wizard unless the user already has a saved API token.
     const hasLocalToken = !!getToken();
-    const hasOAuthSession = !hasLocalToken ? await checkAuthStatus() : false;
-    const hasOAuthErrorParam = new URLSearchParams(window.location.search).has("oauth_error");
 
-    if (!hasLocalToken && !hasOAuthSession || hasOAuthErrorParam) {
+    if (!hasLocalToken) {
       showIntroOverlay();
       showingSetup = true;
     }
@@ -5274,12 +5086,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Only start the app if we have a token (overlay not shown)
   if (!showingSetup) {
     const urlParams = new URLSearchParams(window.location.search);
-    // Clean residual OAuth redirect params from the URL bar (no reload)
-    if (urlParams.has("oauth_success")) {
-      urlParams.delete("oauth_success");
-      const qs = urlParams.toString();
-      window.history.replaceState({}, "", qs ? `?${qs}` : window.location.pathname);
-    }
     const initialView = urlParams.get("view")
       || storageGet("selectedView")
       || "work";

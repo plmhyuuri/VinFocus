@@ -3353,77 +3353,10 @@ body.light .intro_step_note {
     text-decoration: underline;
 }
 
-/* ── Setup Wizard: Choose Login Method Tabs ──────────────────── */
-
-.intro_tab_bar {
-    display: flex;
-    gap: 6px;
-    margin: 14px 0 4px;
-    padding: 4px;
-    background: var(--bg-pill);
-    border: 1px solid var(--border-pill);
-    border-radius: var(--radius-md);
-}
-
-.intro_tab_btn {
-    flex: 1;
-    padding: 9px 12px;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: var(--text-body);
-    font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition-all-fast);
-}
-
-.intro_tab_btn:hover {
-    color: var(--text-primary);
-}
-
-.intro_tab_btn.intro_tab_active {
-    background: var(--accent);
-    color: var(--btn-white);
-}
+/* ── Setup Wizard: Token Entry Panel ─────────────────────────── */
 
 .intro_tab_panel {
     margin-top: 14px;
-}
-
-.intro_tab_panel_title {
-    margin: 0 0 6px;
-    font-size: 1rem;
-    color: var(--text-primary);
-}
-
-.intro_oauth_wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-top: 16px;
-}
-
-.intro_oauth_btn {
-    padding: 13px 24px;
-    border: none;
-    border-radius: var(--radius-md);
-    background: var(--accent);
-    color: var(--btn-white);
-    font-size: var(--text-body);
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s ease, filter 0.15s ease;
-}
-
-.intro_oauth_btn:hover:not(:disabled) {
-    background: var(--accent-hover);
-    filter: brightness(1.15);
-}
-
-.intro_oauth_btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
 }
 
 /* ── Token Settings Button (top-left) ─────────────────────────── */

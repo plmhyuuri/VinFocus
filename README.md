@@ -1,23 +1,23 @@
 # VinFocus
 > "Everything from Canvas. Nothing in your way."
 
-*Development is currently paused pending official approval from Vinschool.*
-
 VinFocus is a personal information hub for Vinschool's Canvas LMS, designed for Vinschool students. It aggregates course modules and items into a cleaner interface so you can browse what exists — without trying to predict what you should do on a given day.
 
+> **Status: archived, not publicly available.** VinFocus is an independent student project. It is **not** publicly available and no public release is planned, because Vinschool IT declined to issue the Canvas developer key required for a public, multi-user sign-in. The code stays open for local/personal use and as a reference.
+
 ## Demo
-> This demo shows a previous version of VinFocus. It does not represent the current development status or planned public authentication flow.
+> This demo shows a previous version of VinFocus and does not represent the current status.
 
 https://github.com/user-attachments/assets/c0bf2085-5e51-4b41-b13e-41436c0d9945
 
 ## Access
 
-VinFocus is currently not publicly available while its integration with Vinschool's Canvas LMS is being reviewed.
+VinFocus is **not publicly available and no public release is planned.** Public, multi-user access depended on a Canvas developer key and OAuth sign-in, which Vinschool IT declined to authorize.
 
-The hosted demo is kept offline during this period. Development and testing continue locally.
+The project remains open-source and can be run locally with your own Canvas API token for personal use. The hosted demo is offline and will stay offline.
 
 ## Screenshots
-> Shown from the current development build. The manual token workflow is intended for local testing only and will be replaced by OAuth for public use.
+> Shown from the current development build. The manual Canvas API token workflow is for local, single-user testing only.
 
 ### Landing Page
 ![VinFocus Landing Page](static/images/landing.png)
@@ -164,7 +164,7 @@ VinFocus doesn't replace Canvas. It reorganizes the same information into a fast
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /health` | Health check endpoint for monitoring. Returns `{ "status": "healthy", "service": "VinFocus", "database": "configured" or "not configured", "database_detail": "ok" or "no database URL configured" or "connection failed", "version": "1.9.0" }`. |
+| `GET /health` | Health check endpoint for monitoring. Returns `{ "status": "healthy", "service": "VinFocus", "database": "configured" or "not configured", "database_detail": "ok" or "no database URL configured" or "connection failed", "version": "1.10.2" }`. |
 
 ### Legacy routes (backward compatibility)
 
@@ -200,7 +200,7 @@ Allowed item types: `Quiz`, `Assignment`, `File`, `Page`.
 
 ## How It Works
 
-The Flask server in `main.py` proxies Canvas API requests. The current development build uses a setup wizard for manually generated Canvas API tokens during local testing. The public release is planned to use Canvas OAuth instead.
+The Flask server in `main.py` proxies Canvas API requests. The setup wizard asks for a manually generated Canvas API token, which is stored in the browser and sent with each request; the server never stores it. Multi-user OAuth sign-in was implemented but removed, since it required a Canvas developer key that Vinschool IT declined to issue.
 
 The frontend loads courses, lets you pick a course and week, and renders items grouped by type. The timetable is stored locally in the browser's `localStorage` and is fully editable. The app also includes an overview sidebar with semester progress, week cards, and completion stats.
 
@@ -208,7 +208,7 @@ A service worker (`static/sw.js`) provides offline support with network-first AP
 
 ## Security
 
-> **Authentication status:** The current development build uses manually generated Canvas API tokens for testing. This workflow is not intended for public, multi-user deployment. Public access is paused while OAuth-based authentication and the required institutional approval are being addressed.
+> **Authentication status:** VinFocus uses manually generated Canvas API tokens only. It is a single-user, local-first tool — not intended for public, multi-user deployment. A public release would have required OAuth with a Canvas developer key, which Vinschool IT declined to issue.
 
 - Tokens are stored only in browser localStorage (or sessionStorage if consent is declined)
 - Tokens are never stored on VinFocus servers
@@ -240,7 +240,7 @@ A service worker (`static/sw.js`) provides offline support with network-first AP
 
 VinFocus can currently be run locally for development and testing.
 
-> **Note:** The current local build uses manual Canvas API tokens for testing. This is not the intended authentication flow for a public multi-user release.
+> **Note:** VinFocus uses manual Canvas API tokens. It is a local, single-user tool — there is no public or multi-user sign-in.
 
 1. Install dependencies:
 
@@ -293,15 +293,17 @@ python tests/test_fixes.py
 
 VinFocus was previously deployed on Render.
 
-Public deployment is currently paused pending official approval from Vinschool
-and changes to the Canvas authentication flow.
+Public deployment is **not planned.** It would have required OAuth-based authentication
+with a Canvas developer key, which Vinschool IT declined to issue. The project is
+maintained for local, single-user use only.
 
 ## Future Plans
 
-- OAuth-based Canvas authentication for public multi-user access, pending institutional approval and developer-key setup
-- Automatic timetable import from VSC Timetable (made a demo but requires permission from Vinschool's IT to continue)
-- Cross-course global search (Experimental)
-- Redesign Settings' UI
+VinFocus is still developed by the author for personal use; it is not maintained for
+distribution or public deployment.
+
+- Automatic timetable import from VSC Timetable (a demo exists but it is currently being developed)
+- Cross-course global search (experimental)
 
 ## Notes
 
