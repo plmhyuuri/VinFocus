@@ -978,16 +978,66 @@ function getActiveFilterBools() {
   return { unfinished: !!s.unfinished, unknown: !!s.unknown };
 }
 
+// The slot that owns the current interaction. Outside split view there is
+// only one logical slot, even though the globals are used directly.
+function currentSlot() {
+  return splitViewEnabled ? activeSlot : "a";
+}
+
+function ensureSlotState(slot) {
+  if (!_slotState[slot]) _slotState[slot] = {};
+  return _slotState[slot];
+}
+
+// Async loads must target the owning slot's DOM directly: the global
+// `itemList` can be swapped to the other panel while a request is in flight.
+function itemListForSlot(slot) {
+  if (slot === "b" && itemListB) return itemListB;
+  return document.getElementById("item_list");
+}
+
+function weekNavForSlot(slot) {
+  if (slot === "b" && weekInputB) {
+    return { input: weekInputB, prev: prevWeekBtnB, next: nextWeekBtnB };
+  }
+  return {
+    input: document.getElementById("week_input"),
+    prev: document.getElementById("prev_week"),
+    next: document.getElementById("next_week"),
+  };
+}
+
+// Snapshot the state a slot had when an async operation started. Loaders use
+// this instead of globals so a later slot switch cannot redirect the result.
+function slotLoadContext(slot) {
+  if (slot === activeSlot) {
+    return {
+      selectedCourseId,
+      currentWeek,
+      availableWeeks,
+      unfinished: !!unfinishedOnly.checked,
+      unknown: !!unknownOnly.checked,
+    };
+  }
+  const s = ensureSlotState(slot);
+  return {
+    selectedCourseId: s.selectedCourseId,
+    currentWeek: s.currentWeek,
+    availableWeeks: s.availableWeeks || [],
+    unfinished: !!s.unfinished,
+    unknown: !!s.unknown,
+  };
+}
+
 // Save the active global state into the given slot's record.
 function saveSlotState(slot) {
-  const s = _slotState[slot];
+  const s = ensureSlotState(slot);
   s.selectedCourseId = selectedCourseId;
   s.currentWeek = currentWeek;
   s.availableWeeks = availableWeeks;
   s.items = items;
   s.overviewData = overviewData || null;
-  s.currentRequestController = currentRequestController;
-  s.currentOverviewController = currentOverviewController;
+  // Request controllers live on the slot state and are managed by the loaders.
   s.overviewLoadingMessageTimer = overviewLoadingMessageTimer;
   s.overviewLoadStartTime = overviewLoadStartTime;
   // Preserve filter state (already stored on the record; kept independent)
@@ -995,7 +1045,7 @@ function saveSlotState(slot) {
 
 // Load a slot's saved state into the globals (used when switching).
 function restoreSlotState(slot) {
-  const s = _slotState[slot];
+  const s = ensureSlotState(slot);
   selectedCourseId = s.selectedCourseId !== undefined ? s.selectedCourseId : null;
   currentWeek = s.currentWeek !== undefined ? s.currentWeek : (() => {
     const w = Number(storageGet("selectedWeek"));
@@ -1004,8 +1054,6 @@ function restoreSlotState(slot) {
   availableWeeks = s.availableWeeks !== undefined ? s.availableWeeks : [];
   items = s.items !== undefined ? s.items : [];
   overviewData = s.overviewData !== undefined ? s.overviewData : null;
-  currentRequestController = s.currentRequestController || null;
-  currentOverviewController = s.currentOverviewController || null;
   overviewLoadingMessageTimer = s.overviewLoadingMessageTimer || null;
   overviewLoadStartTime = s.overviewLoadStartTime || 0;
   syncActiveDomRefs();
@@ -1042,7 +1090,7 @@ function updateColumnHeaders() {
   for (const slot of labels) {
     const el = slot === "b" ? activeColumnHeaderB : activeColumnHeaderA;
     if (!el) continue;
-    const s = _slotState[slot];
+    const s = ensureSlotState(slot);
     const cid = slot === activeSlot ? selectedCourseId : s.selectedCourseId;
     const course = courses.find((c) => c.id === cid);
     const name = course ? courseShortLabel(course) : "—";
@@ -1154,24 +1202,24 @@ function enableSplitView() {
 
   // Render panel A
   renderWorkView();
-
-  // Load slot b
-  const savedSlot = activeSlot;
-  switchToSlot("b");
-  updateColumnHeaders();
-  if (selectedCourseId) {
-    loadWeeks().then(() => {
-      loadItems();
-      loadOverview();
-    });
-  }
-
-  // Switch back to a
-  switchToSlot("a");
-  updateSidebarForSlot("a");
   initPanelEvents();
 
   _splitViewStructured = true;
+
+  // Load slot B by name. Switching the shared globals here would let this
+  // background load bleed into panel A if the user focuses A immediately.
+  const b = ensureSlotState("b");
+  if (b.selectedCourseId) {
+    loadWeeks("b", b.selectedCourseId)
+      .then(() => Promise.all([
+        loadItems(false, "b", b.selectedCourseId, b.currentWeek),
+        loadOverview(false, "b", b.selectedCourseId),
+      ]))
+      .then(updateColumnHeaders)
+      .catch(() => { /* loaders already surfaced the error */ });
+  } else {
+    updateColumnHeaders();
+  }
 }
 
 function disableSplitView() {
@@ -1226,9 +1274,9 @@ function disableSplitView() {
 
 function updateSidebarForSlot(slot) {
   const state = _slotState[slot] || {};
-  const data = slot === activeSlot && overviewData ? overviewData : state.overviewData;
-  if (!data) return;
-  renderOverview(data);
+  const rawOverview = slot === activeSlot && overviewData ? overviewData : state.overviewData;
+  if (!rawOverview) return;
+  renderOverview(applyManualCompletionsToOverview(rawOverview));
 }
 
 // ── Draggable Divider ──────────────────────────────────────────
@@ -1330,25 +1378,16 @@ function initPanelEvents() {
   }
 
   // Panel B week nav
-  if (prevWeekBtnB) prevWeekBtnB.addEventListener("click", (e) => { e.stopPropagation(); switchToSlot("b"); changeWeek(-1); });
-  if (nextWeekBtnB) nextWeekBtnB.addEventListener("click", (e) => { e.stopPropagation(); switchToSlot("b"); changeWeek(1); });
+  if (prevWeekBtnB) prevWeekBtnB.addEventListener("click", (e) => { e.stopPropagation(); switchToSlot("b"); changeWeek(-1, "b"); });
+  if (nextWeekBtnB) nextWeekBtnB.addEventListener("click", (e) => { e.stopPropagation(); switchToSlot("b"); changeWeek(1, "b"); });
   if (weekInputB) {
-    weekInputB.addEventListener("change", (e) => {
+    const commitBWeek = (e) => {
       e.stopPropagation();
       switchToSlot("b");
-      const val = Number(weekInputB.value);
-      if (Number.isFinite(val) && val >= 0) {
-        currentWeek = val;
-        storageSet("selectedWeek", String(currentWeek));
-        updateWeekNav();
-        loadItems();
-      }
-    });
-    weekInputB.addEventListener("blur", (e) => {
-      e.stopPropagation();
-      switchToSlot("b");
-      applyWeekFromInput();
-    });
+      applyWeekFromInput("b", weekInputB);
+    };
+    weekInputB.addEventListener("change", commitBWeek);
+    weekInputB.addEventListener("blur", commitBWeek);
   }
 }
 
@@ -1361,8 +1400,6 @@ let currentWeek = (() => { const w = Number(storageGet("selectedWeek")); return 
 let coursesLoaded = false;
 let itemCache = new Map();
 let timetableMobileView = storageGet("timetableMobileView") || "today";
-let currentRequestController = null; // For cancelling stale requests
-let currentOverviewController = null; // For cancelling stale overview requests
 let overviewLoadingMessageTimer = null; // For progressive loading messages
 let overviewLoadStartTime = 0; // Tracks when overview loading started
 
@@ -1577,20 +1614,24 @@ function hideOfflineBanner() {
 
 window.addEventListener("online", hideOfflineBanner);
 
-function showMessage(text) {
-  itemList.innerHTML = "";
+function showMessage(text, slot = currentSlot()) {
+  const list = itemListForSlot(slot);
+  if (!list) return;
+  list.innerHTML = "";
   const message = document.createElement("p");
   message.className = "empty_message";
   message.textContent = text;
-  itemList.appendChild(message);
+  list.appendChild(message);
 }
 
-function showErrorMessage(text, retryFn) {
-  itemList.innerHTML = "";
+function showErrorMessage(text, retryFn, slot = currentSlot()) {
+  const list = itemListForSlot(slot);
+  if (!list) return;
+  list.innerHTML = "";
   const message = document.createElement("p");
   message.className = "error_message";
   message.textContent = text;
-  itemList.appendChild(message);
+  list.appendChild(message);
 
   if (retryFn) {
     const retryBtn = document.createElement("button");
@@ -1598,10 +1639,10 @@ function showErrorMessage(text, retryFn) {
     retryBtn.className = "error_retry_btn";
     retryBtn.textContent = t("retry");
     retryBtn.addEventListener("click", () => {
-      showSkeletonLoading();
+      showSkeletonLoading(slot);
       retryFn();
     });
-    itemList.appendChild(retryBtn);
+    list.appendChild(retryBtn);
   }
 }
 
@@ -1614,8 +1655,10 @@ function showSkeletonPills(count = 4) {
   }
 }
 
-function showSkeletonLoading() {
-  itemList.innerHTML = "";
+function showSkeletonLoading(slot = currentSlot()) {
+  const list = itemListForSlot(slot);
+  if (!list) return;
+  list.innerHTML = "";
   const skeletonCount = 6;
   for (let i = 0; i < skeletonCount; i++) {
     const skeleton = document.createElement("div");
@@ -1631,7 +1674,7 @@ function showSkeletonLoading() {
     badge.className = "skeleton_badge";
     
     skeleton.append(title, meta, badge);
-    itemList.appendChild(skeleton);
+    list.appendChild(skeleton);
   }
 }
 
@@ -1737,7 +1780,8 @@ function refreshOverviewFromState() {
   if (!overviewData) return;
   const adjusted = applyManualCompletionsToOverview(overviewData);
   if (adjusted && adjusted.totals) {
-    courseProgress.set(selectedCourseId, {
+    const progressCourseId = overviewData.courseId != null ? overviewData.courseId : selectedCourseId;
+    courseProgress.set(progressCourseId, {
       done: adjusted.totals.done || 0,
       total: adjusted.totals.total || 0,
     });
@@ -1823,6 +1867,7 @@ function normalizeOverviewWeek(weekSummary) {
 
 function normalizeOverviewData(data) {
   return {
+    courseId: data.courseId || data.course_id,
     courseName: data.courseName || data.course_name,
     weeks: (data.weeks || []).map(normalizeOverviewWeek),
     totals: data.totals || {},
@@ -1865,192 +1910,137 @@ function createItemRow(item, isLastInType) {
 
   content.append(title, meta);
 
-  // Badge and manual toggle container
+  // Badge and manual toggle container. Every toggle rebuilds this group from
+  // storage so the badge can never drift out of sync with the overview bar.
   const badgeGroup = document.createElement("div");
   badgeGroup.className = "item_badge_group";
 
-  const effectiveCompleted = getEffectiveCompletion(item);
-  const isUnknown = item.completed === null && !isManuallyCompleted(item);
-
-  const badge = document.createElement("span");
-  if (isManuallyCompleted(item)) {
-    badge.className = "status_badge status_done status_manual";
-    badge.textContent = t("done");
-  } else if (effectiveCompleted) {
-    badge.className = "status_badge status_done";
-    badge.textContent = t("done");
-  } else if (isUnknown) {
-    badge.className = "status_badge status_unknown";
-    badge.textContent = "?";
-    badge.title = t("unknown");
-    badge.setAttribute("aria-label", t("unknown"));
-  } else {
-    badge.className = "status_badge status_open";
-    badge.textContent = t("unfinished");
+  function createStatusBadge(manuallyDone, pulse) {
+    const badge = document.createElement("span");
+    if (manuallyDone) {
+      badge.className = "status_badge status_done status_manual"
+        + (pulse ? " status_pulse" : "");
+      badge.textContent = t("done");
+    } else if (getEffectiveCompletion(item)) {
+      badge.className = "status_badge status_done";
+      badge.textContent = t("done");
+    } else if (item.completed === null) {
+      badge.className = "status_badge status_unknown";
+      badge.textContent = "?";
+      badge.title = t("unknown");
+      badge.setAttribute("aria-label", t("unknown"));
+    } else {
+      badge.className = "status_badge status_open";
+      badge.textContent = t("unfinished");
+    }
+    return badge;
   }
 
-  // Manual toggle button (only for items without tracking or not completed)
-  if (!isManuallyCompleted(item) && !effectiveCompleted) {
-    const toggleBtn = document.createElement("button");
-    toggleBtn.type = "button";
-    toggleBtn.className = "manual_done_btn";
-    toggleBtn.textContent = "✓";
-    toggleBtn.title = "Mark as done";
-    toggleBtn.setAttribute("aria-label", "Mark as done");
-    toggleBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const key = `${item.course_id}:${item.module_item_id}`;
-      
-      // Optimistic UI update - immediately show as done
-      const newBadge = document.createElement("span");
-      newBadge.className = "status_badge status_done status_manual status_pulse";
-      newBadge.textContent = t("done");
-      
-      const undoBtn = document.createElement("button");
-      undoBtn.type = "button";
-      undoBtn.className = "manual_done_btn manual_done_btn_undo";
-      undoBtn.textContent = "↩";
-      undoBtn.title = "Undo manual completion";
-      undoBtn.setAttribute("aria-label", "Undo manual completion");
-      undoBtn.addEventListener("click", (ue) => {
-        ue.stopPropagation();
-        saveManualCompletion(key, false);
-        
-        const isUnknown = item.completed === null;
-        const restoredBadge = document.createElement("span");
-        if (isUnknown) {
-          restoredBadge.className = "status_badge status_unknown";
-          restoredBadge.textContent = "?";
-          restoredBadge.title = t("unknown");
-          restoredBadge.setAttribute("aria-label", t("unknown"));
-        } else {
-          restoredBadge.className = "status_badge status_open";
-          restoredBadge.textContent = t("unfinished");
-        }
-        
-        badgeGroup.replaceChildren(restoredBadge, toggleBtn);
-        
-        updateHubTitle();
-        refreshOverviewFromState();
-      });
-      
-      badgeGroup.replaceChildren(newBadge, undoBtn);
-      
-      // Persist to localStorage in background
-      saveManualCompletion(key, true);
-      updateHubTitle();
-      refreshOverviewFromState();
+  function createActionButton(text, className, title, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.textContent = text;
+    button.title = title;
+    button.setAttribute("aria-label", title);
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      onClick();
     });
-    badgeGroup.append(badge, toggleBtn);
-  } else if (isManuallyCompleted(item)) {
-    // Allow undoing manual completion
-    const undoBtn = document.createElement("button");
-    undoBtn.type = "button";
-    undoBtn.className = "manual_done_btn manual_done_btn_undo";
-    undoBtn.textContent = "↩";
-    undoBtn.title = "Undo manual completion";
-    undoBtn.setAttribute("aria-label", "Undo manual completion");
-    undoBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const key = `${item.course_id}:${item.module_item_id}`;
-      
-      // Optimistic UI update - immediately revert to original state
-      const newBadge = document.createElement("span");
-      const isUnknown = item.completed === null;
-      if (isUnknown) {
-        newBadge.className = "status_badge status_unknown";
-        newBadge.textContent = "?";
-        newBadge.title = t("unknown");
-        newBadge.setAttribute("aria-label", t("unknown"));
-      } else {
-        newBadge.className = "status_badge status_open";
-        newBadge.textContent = t("unfinished");
-      }
-      
-      const toggleBtn = document.createElement("button");
-      toggleBtn.type = "button";
-      toggleBtn.className = "manual_done_btn";
-      toggleBtn.textContent = "✓";
-      toggleBtn.title = "Mark as done";
-      toggleBtn.setAttribute("aria-label", "Mark as done");
-      toggleBtn.addEventListener("click", (te) => {
-        te.stopPropagation();
-        const k = `${item.course_id}:${item.module_item_id}`;
-        
-        const doneBadge = document.createElement("span");
-        doneBadge.className = "status_badge status_done status_manual status_pulse";
-        doneBadge.textContent = t("done");
-        
-        const newUndoBtn = document.createElement("button");
-        newUndoBtn.type = "button";
-        newUndoBtn.className = "manual_done_btn manual_done_btn_undo";
-        newUndoBtn.textContent = "↩";
-        newUndoBtn.title = "Undo manual completion";
-        newUndoBtn.setAttribute("aria-label", "Undo manual completion");
-        newUndoBtn.addEventListener("click", (ue2) => {
-          ue2.stopPropagation();
-          saveManualCompletion(k, false);
+    return button;
+  }
+
+  function renderBadgeGroup(pulse = false) {
+    const key = `${item.course_id}:${item.module_item_id}`;
+    const manuallyDone = isManuallyCompleted(item);
+
+    if (manuallyDone) {
+      const undoBtn = createActionButton(
+        "↩",
+        "manual_done_btn manual_done_btn_undo",
+        "Undo manual completion",
+        () => {
+          saveManualCompletion(key, false);
+          renderBadgeGroup();
           updateHubTitle();
           refreshOverviewFromState();
-        });
-        
-        badgeGroup.replaceChildren(doneBadge, newUndoBtn);
-        saveManualCompletion(k, true);
-        updateHubTitle();
-        refreshOverviewFromState();
-      });
-      
-      badgeGroup.replaceChildren(newBadge, toggleBtn);
-      
-      // Persist to localStorage in background
-      saveManualCompletion(key, false);
-      updateHubTitle();
-      refreshOverviewFromState();
-    });
-    badgeGroup.append(badge, undoBtn);
-  } else {
-    badgeGroup.appendChild(badge);
+        }
+      );
+      badgeGroup.replaceChildren(createStatusBadge(true, pulse), undoBtn);
+      return;
+    }
+
+    if (!getEffectiveCompletion(item)) {
+      const toggleBtn = createActionButton(
+        "✓",
+        "manual_done_btn",
+        "Mark as done",
+        () => {
+          saveManualCompletion(key, true);
+          renderBadgeGroup(true);
+          updateHubTitle();
+          refreshOverviewFromState();
+        }
+      );
+      badgeGroup.replaceChildren(createStatusBadge(false, false), toggleBtn);
+      return;
+    }
+
+    badgeGroup.replaceChildren(createStatusBadge(false, false));
   }
+
+  renderBadgeGroup();
 
   row.append(content, badgeGroup);
   return row;
 }
 
-function renderItems() {
+function renderItems(slot = currentSlot(), itemData = null) {
+  const s = ensureSlotState(slot);
+  const list = itemListForSlot(slot);
+  if (!list) return;
+
+  // A background slot must render into its own panel even while another slot
+  // is active; otherwise its skeleton stays until the user clicks the panel.
+  const data = itemData != null ? itemData : (slot === activeSlot ? items : (s.items || []));
+  const filters = slot === activeSlot
+    ? { unfinished: !!unfinishedOnly.checked, unknown: !!unknownOnly.checked }
+    : { unfinished: !!s.unfinished, unknown: !!s.unknown };
+  const overview = slot === activeSlot && overviewData ? overviewData : s.overviewData;
   const searchQuery = searchInput.value.trim().toLowerCase();
-  
+
   // Precompute effective completion once for all items to avoid redundant calls
   const completionMap = new Map();
-  for (const item of items) {
+  for (const item of data) {
     completionMap.set(item, getEffectiveCompletion(item));
   }
-  
-  let scopedItems = items;
-  if (unfinishedOnly.checked) {
-    scopedItems = items.filter((item) => completionMap.get(item) !== true);
-  } else if (unknownOnly.checked) {
-    scopedItems = items.filter((item) => item.completed === null && !isManuallyCompleted(item));
+
+  let scopedItems = data;
+  if (filters.unfinished) {
+    scopedItems = data.filter((item) => completionMap.get(item) !== true);
+  } else if (filters.unknown) {
+    scopedItems = data.filter((item) => item.completed === null && !isManuallyCompleted(item));
   }
   const visibleItems = scopedItems.filter((item) => itemMatchesSearch(item, searchQuery));
 
   if (scopedItems.length === 0) {
     // Check if there are uncategorized modules with items
-    const hasUncategorizedItems = overviewData && overviewData.weeks &&
-      overviewData.weeks.some(w => w.week === 0 && w.total > 0);
+    const hasUncategorizedItems = overview && overview.weeks &&
+      overview.weeks.some(w => w.week === 0 && w.total > 0);
     if (hasUncategorizedItems) {
-      showMessage(t("noItemsWithUncategorized"));
+      showMessage(t("noItemsWithUncategorized"), slot);
     } else {
-      showMessage(t("noItemsWeek"));
+      showMessage(t("noItemsWeek"), slot);
     }
     return;
   }
 
   if (visibleItems.length === 0) {
-    showMessage(t("noItemsMatch"));
+    showMessage(t("noItemsMatch"), slot);
     return;
   }
 
-  itemList.replaceChildren();
+  list.replaceChildren();
 
   for (const type of TYPE_ORDER) {
     const typeItems = visibleItems.filter((item) => item.type === type);
@@ -2065,12 +2055,12 @@ function renderItems() {
     heading.className = "type_heading";
     heading.textContent = `${TYPE_LABELS[type]} (${typeItems.length})`;
 
-    const list = document.createElement("div");
-    list.className = "type_list";
-    list.append(...typeItems.map((item, i) => createItemRow(item, i === typeItems.length - 1)));
+    const typeList = document.createElement("div");
+    typeList.className = "type_list";
+    typeList.append(...typeItems.map((item, i) => createItemRow(item, i === typeItems.length - 1)));
 
-    section.append(heading, list);
-    itemList.append(section);
+    section.append(heading, typeList);
+    list.append(section);
   }
 }
 
@@ -2318,24 +2308,31 @@ function closeSubjectLabelEditor() {
   }
 }
 
-function updateWeekNav() {
-  const weekIndex = availableWeeks.indexOf(currentWeek);
+function updateWeekNav(slot = currentSlot()) {
+  const s = ensureSlotState(slot);
+  const weeks = slot === activeSlot ? availableWeeks : (s.availableWeeks || []);
+  const week = slot === activeSlot ? currentWeek : s.currentWeek;
+  const nav = weekNavForSlot(slot);
+  if (!nav.input || !nav.prev || !nav.next) return;
 
-  weekInput.value = currentWeek != null ? String(currentWeek) : "";
+  const weekIndex = weeks.indexOf(week);
+
+  nav.input.value = week != null ? String(week) : "";
 
   if (weekIndex < 0) {
     // Current week is not in available weeks, enable arrows to jump to nearest valid week
-    prevWeekBtn.disabled = availableWeeks.length === 0;
-    nextWeekBtn.disabled = availableWeeks.length === 0;
+    nav.prev.disabled = weeks.length === 0;
+    nav.next.disabled = weeks.length === 0;
   } else {
-    prevWeekBtn.disabled = weekIndex <= 0;
-    nextWeekBtn.disabled = weekIndex >= availableWeeks.length - 1;
+    nav.prev.disabled = weekIndex <= 0;
+    nav.next.disabled = weekIndex >= weeks.length - 1;
   }
 }
 
-function weekApiPath(courseId, week, bustCache = false) {
+function weekApiPath(courseId, week, bustCache = false, filters = null) {
   let suffix = "";
-  if (unfinishedOnly.checked) suffix = "/unfinished";
+  const unfinished = filters ? filters.unfinished : unfinishedOnly.checked;
+  if (unfinished) suffix = "/unfinished";
   const url = `/api/courses/${courseId}/week/${week}${suffix}`;
   if (bustCache) {
     const sep = url.includes("?") ? "&" : "?";
@@ -2367,13 +2364,17 @@ function updateHubTitle() {
 }
 
 async function loadCourses() {
+  const loadSlot = currentSlot();
+  const s = ensureSlotState(loadSlot);
+
   if (coursesLoaded) {
-    // Keep the work view in sync when returning from overview cards, tabs, or language changes.
-    if (selectedCourseId) {
-      // Run items and overview in parallel since they are independent
+    // Keep the owning work view in sync when returning from overview cards,
+    // tabs, or language changes. Snapshot the slot before awaiting anything.
+    const ctx = slotLoadContext(loadSlot);
+    if (ctx.selectedCourseId) {
       await Promise.all([
-        loadItems(),
-        loadOverview(),
+        loadItems(false, loadSlot, ctx.selectedCourseId, ctx.currentWeek),
+        loadOverview(false, loadSlot, ctx.selectedCourseId),
       ]);
     }
     return;
@@ -2384,7 +2385,7 @@ async function loadCourses() {
   _initialLoadBustCache = false;
 
   showSkeletonPills();
-  showSkeletonLoading();
+  showSkeletonLoading(loadSlot);
 
   try {
     const data = await fetchJson("/api/courses");
@@ -2392,7 +2393,7 @@ async function loadCourses() {
     coursesLoaded = true;
 
     if (courses.length === 0) {
-      showMessage(t("noActiveCourses"));
+      showMessage(t("noActiveCourses"), loadSlot);
       return;
     }
 
@@ -2400,171 +2401,220 @@ async function loadCourses() {
     courses.sort((a, b) => courseShortLabel(a).localeCompare(courseShortLabel(b)));
 
     const savedCourseId = Number(storageGet("selectedCourseId"));
-    selectedCourseId = courses.find((course) => course.id === savedCourseId)?.id ?? courses[0].id;
+    const initialCourseId = courses.find((course) => course.id === savedCourseId)?.id ?? courses[0].id;
+    s.selectedCourseId = initialCourseId;
+    if (s.currentWeek === undefined) s.currentWeek = currentWeek;
+    if (loadSlot === activeSlot) selectedCourseId = initialCourseId;
 
     renderCoursePills();
-    await loadWeeks();
-    
+    await loadWeeks(loadSlot, initialCourseId);
+
     // Run items and overview in parallel since they are independent
     await Promise.all([
-      loadItems(bustCache),
-      loadOverview(bustCache),
+      loadItems(bustCache, loadSlot, initialCourseId, s.currentWeek),
+      loadOverview(bustCache, loadSlot, initialCourseId),
     ]);
 
+    updateColumnHeaders();
+    if (loadSlot === activeSlot) updateSidebarForSlot(loadSlot);
+
     // Seed slot B once split view is structured (initial load happens before
-    // courses are available, so both slots need populating here).
+    // courses are available, so both slots need populating here). Load it
+    // directly by slot instead of switching the shared globals mid-flight.
     if (splitViewEnabled && _splitViewStructured) {
-      if (!_slotState.b.selectedCourseId) {
-        _slotState.b.selectedCourseId = selectedCourseId;
-        _slotState.b.currentWeek = currentWeek;
+      const b = ensureSlotState("b");
+      if (!b.selectedCourseId) {
+        b.selectedCourseId = initialCourseId;
+        b.currentWeek = s.currentWeek;
       }
-      switchToSlot("b");
+      await loadWeeks("b", b.selectedCourseId);
+      await Promise.all([
+        loadItems(false, "b", b.selectedCourseId, b.currentWeek),
+        loadOverview(false, "b", b.selectedCourseId),
+      ]);
       updateColumnHeaders();
-      await loadWeeks();
-      await Promise.all([loadItems(), loadOverview()]);
-      switchToSlot("a");
-      updateSidebarForSlot("a");
     }
   } catch (error) {
-    showErrorMessage(error.message, () => loadCourses());
+    showErrorMessage(error.message, () => loadCourses(), loadSlot);
   }
 }
 
-async function loadWeeks() {
+async function loadWeeks(slot = currentSlot(), courseId = null) {
   // Weeks list itself is small and rarely changes; no cache-bust needed.
-  if (!selectedCourseId) {
-    return;
-  }
+  const s = ensureSlotState(slot);
+  const ctx = slotLoadContext(slot);
+  const targetCourseId = courseId != null ? courseId : ctx.selectedCourseId;
+  if (!targetCourseId) return [];
 
   try {
-    const data = await fetchJson(`/api/courses/${selectedCourseId}/weeks`);
-    availableWeeks = data.weeks;
+    const data = await fetchJson(`/api/courses/${targetCourseId}/weeks`);
+    const weeks = data.weeks || [];
+    s.availableWeeks = weeks;
 
-    if (availableWeeks.length > 0 && !availableWeeks.includes(currentWeek)) {
-      currentWeek = availableWeeks.at(-1);
-      storageSet("selectedWeek", String(currentWeek));
+    let week = ctx.currentWeek;
+    if (week === undefined || week === null) {
+      week = Number(storageGet("selectedWeek"));
     }
+    if (weeks.length > 0 && !weeks.includes(week)) {
+      week = weeks.at(-1);
+      if (slot === activeSlot) storageSet("selectedWeek", String(week));
+    }
+    s.currentWeek = week;
+
+    // Only the active slot owns the globals; each panel has its own week nav.
+    if (slot === activeSlot) {
+      availableWeeks = weeks;
+      currentWeek = week;
+    }
+    updateWeekNav(slot);
+    return weeks;
   } catch (error) {
-    availableWeeks = [];
-    showErrorMessage(error.message, () => loadWeeks());
+    s.availableWeeks = [];
+    if (slot === activeSlot) {
+      availableWeeks = [];
+      showErrorMessage(error.message, () => loadWeeks(slot, targetCourseId), slot);
+    }
     throw error;
   }
-
-  updateWeekNav();
 }
 
-async function loadItems(bustCache = false) {
-  if (!selectedCourseId || (currentWeek !== 0 && !currentWeek)) {
-    return;
-  }
+async function loadItems(bustCache = false, slot = currentSlot(), courseId = null, week = null) {
+  const s = ensureSlotState(slot);
+  const ctx = slotLoadContext(slot);
+  const targetCourseId = courseId != null ? courseId : ctx.selectedCourseId;
+  const targetWeek = week != null ? week : ctx.currentWeek;
+  const filters = { unfinished: !!ctx.unfinished, unknown: !!ctx.unknown };
+  if (!targetCourseId || (targetWeek !== 0 && !targetWeek)) return;
 
-  const cacheKey = `${selectedCourseId}:${currentWeek}:${unfinishedOnly.checked}:${unknownOnly.checked}`;
-  
+  const cacheKey = `${targetCourseId}:${targetWeek}:${filters.unfinished}:${filters.unknown}`;
+
   if (itemCache.has(cacheKey)) {
-    items = itemCache.get(cacheKey);
-    updateHubTitle();
-    updateWeekNav();
-    renderItems();
+    const cachedItems = itemCache.get(cacheKey);
+    s.items = cachedItems;
+    if (slot === activeSlot) {
+      items = cachedItems;
+      updateHubTitle();
+    }
+    updateWeekNav(slot);
+    renderItems(slot, cachedItems);
+    updateColumnHeaders();
     return;
   }
 
-  showSkeletonLoading();
+  showSkeletonLoading(slot);
   setFiltersEnabled(false);
 
-  // Cancel any previous request to prevent race conditions
-  if (currentRequestController) {
-    currentRequestController.abort();
-  }
-  currentRequestController = new AbortController();
-  
+  // Each slot owns its own request controller; a slot switch mid-flight must
+  // not make the response land in the other panel.
+  if (s.currentRequestController) s.currentRequestController.abort();
+  const controller = new AbortController();
+  s.currentRequestController = controller;
+
+  const list = itemListForSlot(slot);
   // Add a "still loading" message after 10 seconds for slow Canvas responses
   const loadItemsTimeout = setTimeout(() => {
-    if (itemList.querySelector('.skeleton_item')) {
-      itemList.innerHTML = "";
+    if (list && list.querySelector('.skeleton_item')) {
+      list.innerHTML = "";
       const stillLoading = document.createElement("p");
       stillLoading.className = "loading_message";
       stillLoading.textContent = t("overviewStillLoading");
-      itemList.appendChild(stillLoading);
+      list.appendChild(stillLoading);
     }
   }, 10000);
 
   try {
-    const data = await fetchJson(weekApiPath(selectedCourseId, currentWeek, bustCache), {
-      signal: currentRequestController.signal
-    });
+    const data = await fetchJson(
+      weekApiPath(targetCourseId, targetWeek, bustCache, filters),
+      { signal: controller.signal }
+    );
     clearTimeout(loadItemsTimeout);
-    items = data.items;
-    updateHubTitle();
-    updateWeekNav();
-    renderItems();
+    s.items = data.items;
+    if (slot === activeSlot) {
+      items = data.items;
+      updateHubTitle();
+    }
+    updateWeekNav(slot);
+    renderItems(slot, data.items);
+    updateColumnHeaders();
   } catch (error) {
     clearTimeout(loadItemsTimeout);
-    if (error.name !== 'AbortError') {
-      showErrorMessage(error.message, () => loadItems());
+    if (error.name !== 'AbortError' && slot === activeSlot) {
+      showErrorMessage(error.message, () => loadItems(bustCache, slot, targetCourseId, targetWeek), slot);
     }
   } finally {
-    currentRequestController = null;
+    if (s.currentRequestController === controller) s.currentRequestController = null;
     setFiltersEnabled(true);
   }
 }
 
 async function selectCourse(courseId) {
   if (subjectLabelEditMode) return; // Don't switch courses in edit mode
-  selectedCourseId = courseId;
-  if (splitViewEnabled) {
-    _slotState[activeSlot].selectedCourseId = courseId;
-  }
-  storageSet("selectedCourseId", String(courseId));
-  renderCoursePills();
-  showSkeletonLoading();
-  setFiltersEnabled(false);
-  await loadWeeks();
-  
-  // Run items and overview in parallel since they are independent
-  await Promise.all([
-    loadItems(),
-    loadOverview(),
-  ]);
-  setFiltersEnabled(true);
 
-  // Update the shared sidebar when in split view
-  if (splitViewEnabled) {
-    updateSidebarForSlot(activeSlot);
-    updateColumnHeaders();
+  // Capture the owning slot before any await: clicking the shared course pills
+  // targets whichever panel was focused at that moment.
+  const targetSlot = currentSlot();
+  const s = ensureSlotState(targetSlot);
+  s.selectedCourseId = courseId;
+  if (targetSlot === activeSlot) {
+    selectedCourseId = courseId;
+    storageSet("selectedCourseId", String(courseId));
   }
+  renderCoursePills();
+  showSkeletonLoading(targetSlot);
+  setFiltersEnabled(false);
+
+  try {
+    await loadWeeks(targetSlot, courseId);
+    const targetWeek = s.currentWeek;
+    await Promise.all([
+      loadItems(false, targetSlot, courseId, targetWeek),
+      loadOverview(false, targetSlot, courseId),
+    ]);
+  } catch (error) {
+    // The loaders already surfaced the error on the owning slot.
+  } finally {
+    setFiltersEnabled(true);
+  }
+
+  updateColumnHeaders();
+  // The sidebar is shared, so only render it if this slot is still focused.
+  if (targetSlot === activeSlot) updateSidebarForSlot(targetSlot);
 }
 
-function changeWeek(delta) {
-  if (availableWeeks.length === 0) return;
+function changeWeek(delta, slot = currentSlot()) {
+  const ctx = slotLoadContext(slot);
+  const weeks = ctx.availableWeeks || [];
+  if (weeks.length === 0) return;
 
-  // Find where currentWeek would be inserted (first week >= currentWeek)
-  let insertPoint = availableWeeks.findIndex((w) => w >= currentWeek);
-  if (insertPoint < 0) insertPoint = availableWeeks.length;
+  const current = ctx.currentWeek;
+  // Find where current would be inserted (first week >= current)
+  let insertPoint = weeks.findIndex((w) => w >= current);
+  if (insertPoint < 0) insertPoint = weeks.length;
 
   let targetIndex;
   if (delta > 0) {
-    // Moving right
-    if (insertPoint < availableWeeks.length && availableWeeks[insertPoint] === currentWeek) {
-      // Current week exists in array, go to next
+    if (insertPoint < weeks.length && weeks[insertPoint] === current) {
       targetIndex = insertPoint + 1;
     } else {
-      // Current week doesn't exist, go to first week >= currentWeek
       targetIndex = insertPoint;
     }
   } else {
-    // Moving left
     targetIndex = insertPoint - 1;
   }
 
-  if (targetIndex < 0 || targetIndex >= availableWeeks.length) return;
+  if (targetIndex < 0 || targetIndex >= weeks.length) return;
 
-  currentWeek = availableWeeks[targetIndex];
-  storageSet("selectedWeek", String(currentWeek));
-  
-  showSkeletonLoading();
+  const targetWeek = weeks[targetIndex];
+  ensureSlotState(slot).currentWeek = targetWeek;
+  if (slot === activeSlot) {
+    currentWeek = targetWeek;
+    storageSet("selectedWeek", String(targetWeek));
+  }
+
+  showSkeletonLoading(slot);
   setFiltersEnabled(false);
   // Load items and scroll to top after a short delay to let the render start
-  loadItems().finally(() => {
+  loadItems(false, slot, null, targetWeek).finally(() => {
     setFiltersEnabled(true);
     requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3346,109 +3396,78 @@ function toggleTimetableEditMode() {
 
 // ── Overview ────────────────────────────────────────────────────
 
-function applyManualCompletionsToOverview(overviewData) {
-  // Adjust overview counts based on manual completions in localStorage
-  const manualCompletions = getManualCompletions();
-  const manualKeys = Object.keys(manualCompletions);
-  if (manualKeys.length === 0) return overviewData;
+// Derive a presentation copy of the overview with manual completions applied.
+// Counts are rebuilt from each week's item list on every call, which keeps the
+// function idempotent: undo can never compound an earlier adjustment. Items
+// that belong to several weeks are counted in each of those weeks because the
+// backend intentionally includes them in every week's items array.
+function deriveOverviewWithManualCompletions(overviewData, manualCompletions) {
+  if (!overviewData) return overviewData;
 
-  const adjustments = {}; // week -> {done_adj, unfinished_adj, unknown_adj}
-  const seenManualKeys = new Set();
-  
-  function adjustForItem(week, item) {
-    if (item.course_id !== selectedCourseId || !item.module_item_id) return;
+  const adjusted = JSON.parse(JSON.stringify(overviewData));
+  const weeks = adjusted.weeks || [];
+  const manual = manualCompletions || {};
 
-    const key = `${item.course_id}:${item.module_item_id}`;
-    if (!manualCompletions[key] || seenManualKeys.has(key)) return;
-    seenManualKeys.add(key);
+  for (const weekSummary of weeks) {
+    // Legacy responses without a per-item list keep their original counts.
+    if (!Array.isArray(weekSummary.items)) continue;
 
-    if (!adjustments[week]) {
-      adjustments[week] = { done_adj: 0, unfinished_adj: 0, unknown_adj: 0 };
-    }
+    let done = 0;
+    let unfinished = 0;
+    let unknown = 0;
 
-    // The item was previously not-done (unfinished or unknown), now manually done.
-    if (item.completed === null) {
-      adjustments[week].unknown_adj -= 1;
-      adjustments[week].done_adj += 1;
-    } else if (item.completed === false) {
-      adjustments[week].unfinished_adj -= 1;
-      adjustments[week].done_adj += 1;
-    }
-  }
-
-  for (const weekSummary of overviewData.weeks || []) {
-    for (const item of weekSummary.items || []) {
-      adjustForItem(weekSummary.week, item);
-    }
-  }
-
-  // Older overview responses did not include item ids. Fall back to loaded weeks.
-  for (const key of manualKeys) {
-    if (seenManualKeys.has(key)) continue;
-
-    for (const [cacheKey, cachedItems] of itemCache.entries()) {
-      // cacheKey format: `${courseId}:${week}:${unfinishedOnly}`
-      const [cId, week, _unf] = cacheKey.split(":").map(x => isNaN(Number(x)) ? x : Number(x));
-      if (cId !== selectedCourseId) continue;
-
-      for (const item of cachedItems) {
-        const itemKey = `${item.course_id}:${item.module_item_id}`;
-        if (itemKey === key) {
-          adjustForItem(week, item);
-          break;
-        }
+    for (const item of weekSummary.items) {
+      const key = String(item.course_id) + ":" + String(item.module_item_id);
+      const completed = manual[key] === true ? true : item.completed;
+      if (completed === true) {
+        done++;
+      } else if (completed === false) {
+        unfinished++;
+      } else {
+        unknown++;
       }
     }
+
+    weekSummary.total = weekSummary.items.length;
+    weekSummary.done = done;
+    weekSummary.unfinished = unfinished;
+    weekSummary.unknown = unknown;
   }
 
-  if (Object.keys(adjustments).length === 0) return overviewData;
+  adjusted.totals = {
+    total: weeks.reduce((sum, w) => sum + (w.total || 0), 0),
+    done: weeks.reduce((sum, w) => sum + (w.done || 0), 0),
+    unfinished: weeks.reduce((sum, w) => sum + (w.unfinished || 0), 0),
+    unknown: weeks.reduce((sum, w) => sum + (w.unknown || 0), 0),
+  };
 
-  // Apply adjustments to a deep copy of the overview data
-  const adjusted = JSON.parse(JSON.stringify(overviewData));
-  for (const weekSummary of adjusted.weeks) {
-    const adj = adjustments[weekSummary.week];
-    if (adj) {
-      weekSummary.done += adj.done_adj;
-      weekSummary.unfinished += adj.unfinished_adj;
-      weekSummary.unknown += adj.unknown_adj;
-    }
-  }
-  // Recompute totals
-  adjusted.totals.total = adjusted.weeks.reduce((s, w) => s + w.total, 0);
-  adjusted.totals.done = adjusted.weeks.reduce((s, w) => s + w.done, 0);
-  adjusted.totals.unfinished = adjusted.weeks.reduce((s, w) => s + w.unfinished, 0);
-  adjusted.totals.unknown = adjusted.weeks.reduce((s, w) => s + w.unknown, 0);
+  const weekZero = weeks.find((w) => w.week === 0);
+  adjusted.uncategorized_unfinished_count = weekZero
+    ? (weekZero.unfinished || 0) + (weekZero.unknown || 0)
+    : 0;
 
-  // Also adjust uncategorized_unfinished_count for week 0 (Unassigned Modules) items
-  const week0Adj = adjustments[0];
-  if (week0Adj) {
-    adjusted.uncategorized_unfinished_count = Math.max(
-      0,
-      adjusted.uncategorized_unfinished_count + week0Adj.unfinished_adj + week0Adj.unknown_adj
-    );
-  }
-  
   return adjusted;
 }
 
-async function loadOverview(bustCache = false) {
-  if (!selectedCourseId) return;
+function applyManualCompletionsToOverview(overviewData) {
+  return deriveOverviewWithManualCompletions(overviewData, getManualCompletions());
+}
 
-  // Capture which slot owns this load so async completion updates the right
-  // slot's state and only touches the shared sidebar if that slot is active.
-  const loadSlot = splitViewEnabled ? activeSlot : "a";
-  const loadCourseId = selectedCourseId;
+async function loadOverview(bustCache = false, slot = currentSlot(), courseId = null) {
+  // Capture the owning slot and course before any await. The slot switch can
+  // happen while the request is in flight, so neither value may be read from
+  // globals once the response arrives.
+  const loadSlot = slot || currentSlot();
+  const s = ensureSlotState(loadSlot);
+  const ctx = slotLoadContext(loadSlot);
+  const loadCourseId = courseId != null ? courseId : ctx.selectedCourseId;
+  if (!loadCourseId) return;
 
-  // Cancel any previous overview request for this slot to prevent race conditions
-  const prevController = splitViewEnabled ? _slotState[loadSlot].currentOverviewController : currentOverviewController;
-  if (prevController) prevController.abort();
-  const thisOverviewController = new AbortController();
-  if (splitViewEnabled) {
-    _slotState[loadSlot].currentOverviewController = thisOverviewController;
-  } else {
-    currentOverviewController = thisOverviewController;
-  }
-  const signal = thisOverviewController.signal;
+  // Each slot owns its own controller, just like loadItems.
+  if (s.currentOverviewController) s.currentOverviewController.abort();
+  const controller = new AbortController();
+  s.currentOverviewController = controller;
+  const signal = controller.signal;
 
   // The shared sidebar only shows the active slot's overview, so skeleton and
   // loading messages are only meaningful when this slot is active.
@@ -3467,15 +3486,15 @@ async function loadOverview(bustCache = false) {
     const cacheBustParam = bustCache ? `?_t=${Date.now()}` : "";
     const data = await fetchJson(`${overviewUrl}${cacheBustParam}`, { signal });
 
-    const normalized = normalizeOverviewData(data);
+    const rawOverview = normalizeOverviewData(data);
+
+    // Store the raw server response on the owning slot as the source of truth.
+    // Manual overrides are derived at render time so undo always starts from
+    // the same base.
+    s.overviewData = rawOverview;
 
     // Apply manual completions before computing progress for bars
-    const adjusted = applyManualCompletionsToOverview(normalized);
-
-    // Store overview for the owning slot
-    if (splitViewEnabled) {
-      _slotState[loadSlot].overviewData = adjusted;
-    }
+    const adjusted = applyManualCompletionsToOverview(rawOverview);
 
     // Store course progress for progress bars (use adjusted totals so manual
     // completions are reflected in the bar, matching the semester progress)
@@ -3488,9 +3507,9 @@ async function loadOverview(bustCache = false) {
       renderCoursePills();
     }
 
-    // Only update the shared sidebar / loading state if this slot is active
+    // Only update the shared sidebar / loading state if this slot is still active
     if (loadSlot === activeSlot) {
-      overviewData = adjusted;
+      overviewData = rawOverview;
       clearOverviewLoadingMessageTimer();
       renderOverview(adjusted);
     }
@@ -3498,14 +3517,10 @@ async function loadOverview(bustCache = false) {
     if (error.name === 'AbortError') return;
     if (loadSlot === activeSlot) {
       clearOverviewLoadingMessageTimer();
-      showOverviewError(error.message, () => loadOverview());
+      showOverviewError(error.message, () => loadOverview(bustCache, loadSlot, loadCourseId));
     }
   } finally {
-    if (splitViewEnabled) {
-      _slotState[loadSlot].currentOverviewController = null;
-    } else {
-      currentOverviewController = null;
-    }
+    if (s.currentOverviewController === controller) s.currentOverviewController = null;
   }
 }
 
@@ -3909,9 +3924,14 @@ let weekNavListenersAttached = false;
 
 function attachWeekNavListeners() {
   if (weekNavListenersAttached) return;
-  
-  prevWeekBtn.addEventListener("click", () => changeWeek(-1));
-  nextWeekBtn.addEventListener("click", () => changeWeek(1));
+
+  // Bind the listeners to the elements captured here and remember which slot
+  // owns them; the globals are re-pointed on every slot switch.
+  const prevBtn = prevWeekBtn;
+  const nextBtn = nextWeekBtn;
+  const slot = prevBtn && prevBtn.id.endsWith("_b") ? "b" : "a";
+  if (prevBtn) prevBtn.addEventListener("click", () => changeWeek(-1, slot));
+  if (nextBtn) nextBtn.addEventListener("click", () => changeWeek(1, slot));
   weekNavListenersAttached = true;
 }
 
@@ -3922,22 +3942,30 @@ if (document.readyState === "loading") {
   attachWeekNavListeners();
 }
 
-function applyWeekFromInput() {
-  const value = Number(weekInput.value);
+function applyWeekFromInput(slot = currentSlot(), input = null) {
+  const field = input || weekInput;
+  if (!field) return;
+  const value = Number(field.value);
+  const s = ensureSlotState(slot);
+  const currentForSlot = slot === activeSlot ? currentWeek : s.currentWeek;
+
   if (!Number.isFinite(value) || value < 0) {
-    updateWeekNav();
+    updateWeekNav(slot);
     return;
   }
-  if (value === currentWeek) {
-    updateWeekNav();
+  if (value === currentForSlot) {
+    updateWeekNav(slot);
     return;
   }
 
-  currentWeek = value;
-  storageSet("selectedWeek", String(currentWeek));
-  showSkeletonLoading();
+  s.currentWeek = value;
+  if (slot === activeSlot) {
+    currentWeek = value;
+    storageSet("selectedWeek", String(value));
+  }
+  showSkeletonLoading(slot);
   setFiltersEnabled(false);
-  loadItems().finally(() => {
+  loadItems(false, slot, null, value).finally(() => {
     setFiltersEnabled(true);
     requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3945,17 +3973,20 @@ function applyWeekFromInput() {
   });
 }
 
-weekInput.addEventListener("keydown", (event) => {
+// These listeners belong to the original panel A input. Capture that element
+// now: the global `weekInput` is re-pointed whenever the active slot changes.
+const weekInputA = weekInput;
+weekInputA.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
-    applyWeekFromInput();
+    applyWeekFromInput("a", weekInputA);
   }
 });
 
 // iOS has no Enter/"Go" on the number keyboard — the value only commits on
 // blur/change, so handle those (idempotently) as well.
-weekInput.addEventListener("change", applyWeekFromInput);
-weekInput.addEventListener("blur", applyWeekFromInput);
+weekInputA.addEventListener("change", () => applyWeekFromInput("a", weekInputA));
+weekInputA.addEventListener("blur", () => applyWeekFromInput("a", weekInputA));
 
 document.addEventListener("keydown", (event) => {
   // Don't hijack typing inside inputs, textareas, contenteditable, selects,
