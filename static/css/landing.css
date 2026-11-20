@@ -608,20 +608,29 @@ a {
     text-wrap: balance;
 }
 
+.hero_lead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px 28px;
+    margin-bottom: 14px;
+}
+
 .hero_desc {
     font-size: 1.0625rem;
     color: var(--hero-ink-2);
     line-height: 1.7;
     max-width: 54ch;
-    margin: 0 auto 14px;
+    margin: 0;
 }
 
 .hero_notice {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    max-width: 62ch;
-    margin: 0 auto 14px;
+    max-width: min(46ch, 100%);
+    margin: 0;
     padding: 6px 14px;
     border: 1px solid var(--hero-line);
     border-radius: 12px;
@@ -1092,6 +1101,10 @@ a {
 
 .hero_load_desc {
     animation: riseIn 0.7s var(--ease) 0.08s both;
+}
+
+.hero_load_notice {
+    animation: riseIn 0.7s var(--ease) 0.16s both;
 }
 
 .hero_load_shot {

@@ -270,11 +270,12 @@
     }, 30);
   }
 
-  document.querySelectorAll(".hero_title, .hero_desc, .hero_kbd, .hero_shot")
+  document.querySelectorAll(".hero_title, .hero_desc, .hero_notice, .hero_kbd, .hero_shot")
     .forEach(function (el) {
       var map = {
         "hero_title": "hero_load_title",
         "hero_desc": "hero_load_desc",
+        "hero_notice": "hero_load_notice",
         "hero_kbd": "hero_load_kbd",
         "hero_shot": "hero_load_shot"
       };
@@ -313,7 +314,7 @@
       about_title: "Built because Canvas was in the way.",
       about_body1: "I'm a student at Vinschool. Every week meant opening Canvas, clicking a course, scrolling a module list, and hoping the quiz I needed was where I remembered it. It usually wasn't.",
       about_body2: "So I built VinFocus. It reads the same courses you already have and rearranges them into a calmer, faster dashboard. It doesn't decide what you should do. It just makes what exists easier to find.",
-      about_mono: "not affiliated with vinschool or canvas. it just makes them usable.",
+      about_mono: "not affiliated with vinschool or canvas",
       privacy_eyebrow: "// privacy",
       privacy_title: "Check the permissions yourself.",
       privacy_prompt: "$ vinfocus --check-permissions",
@@ -380,7 +381,7 @@
       about_title: "Được tạo ra vì Canvas làm mọi thứ khó hơn.",
       about_body1: "Tôi là học sinh Vinschool. Mỗi tuần nghĩa là mở Canvas, bấm vào khóa học, cuộn danh sách học phần, và hy vọng bài kiểm tra cần tìm nằm đúng chỗ tôi nhớ. Thường thì không.",
       about_body2: "Nên tôi tạo ra VinFocus. Nó đọc chính những khóa học bạn đang có và sắp xếp lại chúng thành một bảng điều khiển gọn gàng và nhanh hơn. Nó không quyết định bạn nên làm gì. Nó chỉ giúp những gì đang có dễ tìm hơn.",
-      about_mono: "không liên kết với vinschool hay canvas. chỉ làm chúng dễ dùng hơn.",
+      about_mono: "không liên kết với vinschool hay canvas",
       privacy_eyebrow: "// quyền riêng tư",
       privacy_title: "Tự kiểm tra quyền hạn của ứng dụng.",
       privacy_prompt: "$ vinfocus --check-permissions",

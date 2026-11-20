@@ -270,6 +270,16 @@ const TRANSLATIONS = {
     loadExampleSchedule: "Load Example Schedule",
     loadExampleConfirm: "Replace your current timetable with the example schedule?",
     timetableEmptyHint: "Your timetable is empty. Press the pencil to add your classes, or load the example schedule while editing.",
+    timetableSyncAvailable: "A new timetable is available from VSC.",
+    timetableSyncReview: "Review & apply",
+    timetableSyncDismiss: "Dismiss",
+    timetableSyncPreviewTitle: "Timetable update from VSC",
+    timetableSyncPreviewDesc: "Review the imported week below. Applying will replace your current timetable.",
+    timetableSyncApply: "Apply (replace all)",
+    timetableSyncCancel: "Cancel",
+    timetableSyncWarningsTitle: "Some items were left empty",
+    timetableSyncUnmapped: "Unmapped subject",
+    timetableSyncLunchRoom: "Lunch room (room only)",
     clearSlot: "Empty",
     room: "Room",
     roomPlaceholder: "Room (e.g. B3-201)",
@@ -290,8 +300,8 @@ const TRANSLATIONS = {
     introNext: "Next",
     introPrev: "Back",
     introFinish: "Finish",
-introChooseTitle: "Connect to Canvas",
-introChooseDesc: "Paste a Personal Access Token from Canvas Settings → Approved Integrations. Tokens expire every 4 months.",
+    introChooseTitle: "Connect to Canvas",
+    introChooseDesc: "Paste a Personal Access Token from Canvas Settings → Approved Integrations. Tokens expire every 4 months.",
     introTokenLabel: "Paste your API token here",
     introTokenPlaceholder: "Paste API token…",
     introValidate: "Validate & Save",
@@ -505,6 +515,16 @@ introChooseDesc: "Paste a Personal Access Token from Canvas Settings → Approve
     loadExampleSchedule: "Tải Lịch Mẫu",
     loadExampleConfirm: "Thay thế thời khóa biểu hiện tại bằng lịch mẫu?",
     timetableEmptyHint: "Thời khóa biểu của bạn đang trống. Bấm bút chì để thêm lớp học, hoặc tải lịch mẫu khi đang chỉnh sửa.",
+    timetableSyncAvailable: "Có thời khóa biểu mới từ VSC.",
+    timetableSyncReview: "Xem & áp dụng",
+    timetableSyncDismiss: "Bỏ qua",
+    timetableSyncPreviewTitle: "Cập nhật thời khóa biểu từ VSC",
+    timetableSyncPreviewDesc: "Xem trước tuần được nhập bên dưới. Áp dụng sẽ thay thế thời khóa biểu hiện tại.",
+    timetableSyncApply: "Áp dụng (thay thế tất cả)",
+    timetableSyncCancel: "Hủy",
+    timetableSyncWarningsTitle: "Một số mục đã được để trống",
+    timetableSyncUnmapped: "Môn chưa được nhận dạng",
+    timetableSyncLunchRoom: "Phòng nghỉ trưa (chỉ phòng)",
     clearSlot: "Trống",
     room: "Phòng",
     roomPlaceholder: "Phòng (vd. B3-201)",
@@ -525,8 +545,8 @@ introChooseDesc: "Paste a Personal Access Token from Canvas Settings → Approve
     introNext: "Tiếp theo",
     introPrev: "Quay lại",
     introFinish: "Hoàn tất",
-introChooseTitle: "Kết nối với Canvas",
-introChooseDesc: "Dán Mã Truy Cập Cá Nhân từ Canvas Settings → Tích Hợp Được Phê Duyệt. Mã hết hạn sau 4 tháng.",
+    introChooseTitle: "Kết nối với Canvas",
+    introChooseDesc: "Dán Mã Truy Cập Cá Nhân từ Canvas Settings → Tích Hợp Được Phê Duyệt. Mã hết hạn sau 4 tháng.",
     introTokenLabel: "Dán mã API của bạn vào đây",
     introTokenPlaceholder: "Dán mã API…",
     introValidate: "Xác thực & Lưu",
@@ -633,6 +653,7 @@ const SUBJECT_LABELS = {
     MUS: "Music",
     PE: "Sports",
     ART: "Art",
+    "GDQP-AN": "GDQP-AN"
   },
   vi: {
     MATHS: "Toán",
@@ -655,6 +676,7 @@ const SUBJECT_LABELS = {
     MUS: "Âm Nhạc",
     PE: "Thể Chất",
     ART: "Mỹ Thuật",
+    "GDQP-AN": "GDQP-AN",
   },
 };
 
@@ -1463,7 +1485,9 @@ const SUBJECT_NAME_TO_KEY = {
   "ENGLISH (FOREIGN TEACHERS)" : "ESL (GVNN)",
   "CÔNG NGHỆ" : "TECH",
   "GIÁO DỤC KINH TẾ VÀ PHÁP LUẬT": "GDKT-PL",
-  "HOẠT ĐỘNG TRẢI NGHIỆM, HƯỚNG NGHIỆP": "CAREER"
+  "HOẠT ĐỘNG TRẢI NGHIỆM, HƯỚNG NGHIỆP": "CAREER",
+  "GIÁO DỤC QUỐC PHÒNG": "GDQP-AN",
+  "NỘI DUNG GIÁO DỤC CỦA ĐỊA PHƯƠNG": "LOCE"
 };
 
 function courseSubjectKey(course) {
@@ -2868,9 +2892,26 @@ function renderTimetableGrid() {
       const breakSubject = document.createElement("p");
       breakSubject.className = "slot_subject";
       breakSubject.textContent = t(period.labelKey);
+
+      let metaText = `${period.start}-\n${period.end}`;
+      if (period.key === "lunch") {
+        const rooms = [];
+        for (const day of TIMETABLE_DAYS) {
+          const entry = timetableEntryFor(day.key, period.key);
+          if (entry?.room && !rooms.includes(entry.room)) {
+            rooms.push(entry.room);
+          }
+        }
+        if (rooms.length === 1) {
+          metaText = `${period.start}-\n${period.end}\n${rooms[0]}`;
+        } else if (rooms.length > 1) {
+          metaText = `${period.start}-\n${period.end}\n${rooms.join(", ")}`;
+        }
+      }
+
       const breakMeta = document.createElement("p");
       breakMeta.className = "slot_meta";
-      breakMeta.textContent = `${period.start}-\n${period.end}`;
+      breakMeta.textContent = metaText;
       breakCell.append(breakSubject, breakMeta);
       cells.push(breakCell);
       continue;
@@ -3005,6 +3046,9 @@ function renderTimetableMobile() {
       if (period.type === "class" && !entry) {
         continue;
       }
+      if (period.type === "break" && period.key === "lunch" && !entry?.room) {
+        continue;
+      }
 
       const slot = document.createElement("div");
       slot.className = "mobile_slot";
@@ -3104,6 +3148,267 @@ function loadExampleSchedule() {
   TIMETABLE = JSON.parse(JSON.stringify(DEFAULT_TIMETABLE));
   saveTimetable(TIMETABLE);
   renderTimetable(true);
+}
+
+// ── Timetable sync (silent, VSC) ───────────────────────────────
+
+let _pendingTimetableSync = null;
+let _timetableSyncInFlight = false;
+let _lastTimetableSyncPromptKey = null;
+
+function localDateISO(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function normalizeTimetableShape(timetable) {
+  const normalized = {};
+  for (const day of TIMETABLE_DAYS) {
+    const entries = Array.isArray(timetable?.[day.key]) ? timetable[day.key] : [];
+    normalized[day.key] = entries
+      .filter((e) => e && e.period)
+      .map((e) => {
+        const out = { period: e.period };
+        if (e.subject) out.subject = e.subject;
+        if (e.room) out.room = e.room;
+        return out;
+      })
+      .sort((a, b) => String(a.period).localeCompare(String(b.period)));
+  }
+  return normalized;
+}
+
+function timetableFingerprint(timetable) {
+  try {
+    return JSON.stringify(normalizeTimetableShape(timetable));
+  } catch {
+    return "";
+  }
+}
+
+function dismissTimetableSyncBanner() {
+  const banner = document.getElementById("timetable_sync_banner");
+  if (banner) banner.remove();
+}
+
+function showTimetableSyncBanner() {
+  dismissTimetableSyncBanner();
+  if (!_pendingTimetableSync) return;
+
+  const container = document.querySelector("#timetable_view .timetable_container") || document.getElementById("timetable_view");
+  if (!container) return;
+
+  const banner = document.createElement("div");
+  banner.id = "timetable_sync_banner";
+  banner.className = "token_warning";
+  banner.style.position = "static";
+  banner.style.margin = "0 0 12px 0";
+
+  const text = document.createElement("span");
+  text.className = "token_warning_text";
+  text.textContent = t("timetableSyncAvailable");
+
+  const reviewBtn = document.createElement("button");
+  reviewBtn.type = "button";
+  reviewBtn.className = "token_warning_btn";
+  reviewBtn.textContent = t("timetableSyncReview");
+  reviewBtn.addEventListener("click", () => openTimetableSyncPreview());
+
+  const dismissBtn = document.createElement("button");
+  dismissBtn.type = "button";
+  dismissBtn.className = "token_warning_dismiss";
+  dismissBtn.setAttribute("aria-label", t("timetableSyncDismiss"));
+  dismissBtn.textContent = "✕";
+  dismissBtn.addEventListener("click", () => {
+    _pendingTimetableSync = null;
+    dismissTimetableSyncBanner();
+  });
+
+  banner.append(text, reviewBtn, dismissBtn);
+  container.insertBefore(banner, container.firstChild);
+}
+
+function formatSyncWarning(w) {
+  const dayLabel = t(TIMETABLE_DAYS.find((d) => d.key === w.day)?.labelKey || w.day || "");
+  const period = w.period || (w.period_index_order != null ? `#${w.period_index_order}` : "");
+  const course = w.course_name || "";
+  let reason = w.reason || "";
+  if (reason === "unmapped_subject") reason = t("timetableSyncUnmapped");
+  else if (reason === "lunch_room_only") reason = t("timetableSyncLunchRoom");
+  return [dayLabel, period, course, reason].filter(Boolean).join(" · ");
+}
+
+function openTimetableSyncPreview() {
+  if (!_pendingTimetableSync) return;
+
+  const pending = _pendingTimetableSync;
+  const existing = document.getElementById("timetable_sync_modal");
+  if (existing) existing.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "timetable_sync_modal";
+  modal.className = "token_settings_modal";
+  modal.style.display = "flex";
+
+  const content = document.createElement("div");
+  content.className = "token_settings_content";
+
+  const title = document.createElement("h2");
+  title.textContent = t("timetableSyncPreviewTitle");
+  title.style.marginTop = "0";
+
+  const desc = document.createElement("p");
+  desc.className = "intro_subtitle";
+  desc.style.marginBottom = "12px";
+  desc.textContent = t("timetableSyncPreviewDesc");
+
+  const summary = document.createElement("div");
+  summary.style.maxHeight = "40vh";
+  summary.style.overflow = "auto";
+  summary.style.marginBottom = "12px";
+
+  for (const day of TIMETABLE_DAYS) {
+    const entries = Array.isArray(pending.timetable?.[day.key]) ? pending.timetable[day.key] : [];
+    const section = document.createElement("div");
+    section.style.marginBottom = "10px";
+    const h = document.createElement("div");
+    h.style.fontWeight = "bold";
+    h.style.marginBottom = "4px";
+    h.textContent = t(day.labelKey);
+    section.appendChild(h);
+    if (entries.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "slot_meta";
+      empty.textContent = t("noClassesAdded");
+      section.appendChild(empty);
+    } else {
+      for (const e of entries) {
+        const row = document.createElement("div");
+        row.className = "slot_meta";
+        const periodObj = TIMETABLE_PERIODS.find((p) => p.key === e.period);
+        const periodLabel = periodObj ? t(periodObj.labelKey) : e.period;
+        const subj = e.subject ? getSubjectLabel(e.subject) : (e.period === "lunch" ? t("lunchBreak") : t("free"));
+        row.textContent = `${periodLabel}: ${subj}${e.room ? ` (${e.room})` : ""}`;
+        section.appendChild(row);
+      }
+    }
+    summary.appendChild(section);
+  }
+
+  content.append(title, desc, summary);
+
+  if (Array.isArray(pending.warnings) && pending.warnings.length > 0) {
+    const warnTitle = document.createElement("div");
+    warnTitle.style.fontWeight = "bold";
+    warnTitle.style.margin = "8px 0 4px";
+    warnTitle.textContent = t("timetableSyncWarningsTitle");
+    const warnList = document.createElement("div");
+    warnList.className = "slot_meta";
+    warnList.style.maxHeight = "20vh";
+    warnList.style.overflow = "auto";
+    const unique = [];
+    const seen = new Set();
+    for (const w of pending.warnings) {
+      const line = formatSyncWarning(w);
+      if (!seen.has(line)) {
+        seen.add(line);
+        unique.push(line);
+      }
+    }
+    warnList.textContent = unique.slice(0, 20).join("\n");
+    warnList.style.whiteSpace = "pre-wrap";
+    content.append(warnTitle, warnList);
+  }
+
+  const actions = document.createElement("div");
+  actions.style.display = "flex";
+  actions.style.gap = "8px";
+  actions.style.marginTop = "16px";
+
+  const applyBtn = document.createElement("button");
+  applyBtn.type = "button";
+  applyBtn.className = "intro_validate_btn";
+  applyBtn.textContent = t("timetableSyncApply");
+  applyBtn.addEventListener("click", () => {
+    if (timetableEditMode) {
+      toggleTimetableEditMode();
+    }
+    TIMETABLE = normalizeTimetableShape(pending.timetable);
+    saveTimetable(TIMETABLE);
+    _pendingTimetableSync = null;
+    modal.remove();
+    dismissTimetableSyncBanner();
+    renderTimetable(true);
+  });
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "timetable_editor_btn";
+  cancelBtn.textContent = t("timetableSyncCancel");
+  cancelBtn.addEventListener("click", () => {
+    _pendingTimetableSync = null;
+    modal.remove();
+    dismissTimetableSyncBanner();
+  });
+
+  actions.append(applyBtn, cancelBtn);
+  content.appendChild(actions);
+  modal.appendChild(content);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      modal.remove();
+    }
+  });
+  document.body.appendChild(modal);
+}
+
+async function syncTimetableFromVSC(options = {}) {
+  const { force = false } = options;
+  if (_timetableSyncInFlight) return;
+
+  const token = getToken ? getToken() : (storageGet("canvasToken") || "");
+  if (!token) return;
+
+  _timetableSyncInFlight = true;
+  try {
+    const date = localDateISO(new Date());
+    const response = await fetch(`/api/timetable/sync?date=${encodeURIComponent(date)}`, {
+      headers: { "Authorization": `Bearer ${token}` },
+    });
+    if (!response.ok) return;
+
+    const data = await response.json().catch(() => null);
+    if (!data || !data.available || !data.timetable) return;
+
+    const incoming = normalizeTimetableShape(data.timetable);
+    const incomingFp = timetableFingerprint(incoming);
+    const currentFp = timetableFingerprint(TIMETABLE);
+    const promptKey = `${data.week_start || date}:${incomingFp}`;
+
+    if (incomingFp === currentFp) {
+      _pendingTimetableSync = null;
+      dismissTimetableSyncBanner();
+      return;
+    }
+    if (!force && _lastTimetableSyncPromptKey === promptKey) {
+      return;
+    }
+
+    _pendingTimetableSync = { timetable: incoming, warnings: data.warnings || [], week_start: data.week_start };
+    _lastTimetableSyncPromptKey = promptKey;
+    showTimetableSyncBanner();
+  } catch (err) {
+    debugLog("Timetable sync skipped:", err);
+  } finally {
+    _timetableSyncInFlight = false;
+  }
+}
+
+function triggerTimetableSync() {
+  // Silent automatic sync on timetable view open
+  syncTimetableFromVSC().catch(() => {});
 }
 
 function isMobile() {
@@ -3897,6 +4202,7 @@ function setView(viewName) {
       }
     } else if (nextView === "timetable") {
       renderTimetable();
+      triggerTimetableSync();
     }
   };
 

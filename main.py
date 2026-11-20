@@ -6,6 +6,7 @@ import logging
 import hashlib
 import hmac
 import secrets
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Tuple
 from functools import lru_cache
@@ -22,6 +23,8 @@ from psycopg2.extras import RealDictCursor
 from psycopg2.pool import SimpleConnectionPool
 
 from dotenv import load_dotenv
+
+from timetable import TimetableFetchError, get_timetable as fetch_vsc_timetable, week_dates_for
 
 load_dotenv()
 
@@ -1502,6 +1505,204 @@ def delete_feedback(feedback_id: int):
 
 
 # ─── Health Check ───────────────────────────────────────────────
+
+# ─── Timetable Sync (VSC LTI) ──────────────────────────────────
+
+_PERIOD_INDEX_TO_SLOT = {1: "p1", 2: "p2", 3: "p3", 4: "p4", 5: "p5", 9: "p6", 10: "p7"}
+
+
+def _normalize_course_subject(course_name: str) -> Optional[str]:
+    """Best-effort mapping from VSC timetable course_name to app subject ID."""
+    if not course_name:
+        return None
+    name = course_name.strip()
+    lower = name.lower()
+
+    # English / ESL variants first (preserve GVVN/GVNN distinction)
+    if "gvvn" in lower or "esl (gvvn)" in lower:
+        return "ESL (GVVN)"
+    if "gvnn" in lower or "esl (gvnn)" in lower:
+        return "ESL (GVNN)"
+
+    # Vietnamese subject names (order matters for specificity)
+    # "Công dân toàn cầu" -> GCED; plain GDCD/civics handled later if needed
+    if "công dân toàn cầu" in lower or "cong dan toan cau" in lower:
+        return "GCED"
+    if "gdqp" in lower or "quốc phòng" in lower or "quoc phong" in lower:
+        return "GDQP-AN"
+    if "hóa học" in lower or "hoa hoc" in lower or re.search(r"\bhóa\b|\bhoa\b", lower):
+        return "CHEM"
+    if "toán" in lower or "toan" in lower:
+        return "MATHS"
+    if "vật lý" in lower or "vat ly" in lower or re.search(r"\bvật lí\b|\bvat li\b", lower):
+        return "PHY"
+    if "sinh học" in lower or "sinh hoc" in lower:
+        return "BIO"
+    if "tin học" in lower or "tin hoc" in lower:
+        return "IT"
+    if "công nghệ" in lower or "cong nghe" in lower:
+        return "TECH"
+    if "địa lý" in lower or "dia ly" in lower or re.search(r"\bđịa lí\b|\bdia li\b", lower):
+        return "GEO"
+    if "lịch sử" in lower or "lich su" in lower:
+        return "HIS"
+    if "ngữ văn" in lower or "ngu van" in lower or re.search(r"\bvăn\b|\bvan\b", lower):
+        return "NV"
+    if "âm nhạc" in lower or "am nhac" in lower:
+        return "MUS"
+    if "mỹ thuật" in lower or "my thuat" in lower:
+        return "ART"
+    if "thể dục" in lower or "the duc" in lower or "thể chất" in lower or "the chat" in lower:
+        return "PE"
+    if "clise" in lower:
+        return "CLISE"
+    if "giáo dục kỹ năng phẩm chất" in lower or "giao duc ky nang pham chat" in lower or "kỹ năng phẩm chất" in lower or "ky nang pham chat" in lower:
+        return "CLISE"
+    if "career" in lower or "hướng nghiệp" in lower or "huong nghiep" in lower:
+        return "CAREER"
+    if "việt nam học" in lower or "viet nam hoc" in lower or "việt nam hoc" in lower or "viet nam học" in lower:
+        return "VNS"
+    if "vnh" in lower or "vinschool" in lower:
+        return "VNS"
+
+    return None
+
+
+def _normalize_room(classroom: Optional[str]) -> str:
+    if not classroom:
+        return ""
+    return str(classroom).strip()
+
+
+def _map_timetable_day(day_key: str, payload: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Map one day's VSC timetable payload into app entries and warnings."""
+    entries: List[Dict[str, Any]] = []
+    warnings: List[Dict[str, Any]] = []
+    used_periods = set()
+
+    if not isinstance(payload, dict) or not payload.get("success"):
+        raise TimetableFetchError("Timetable day payload was not successful")
+
+    data = payload.get("data") or []
+    if not isinstance(data, list):
+        return entries, warnings
+
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+
+        period_order = item.get("period_index_order")
+        period_name = str(item.get("period_name") or "")
+        time_frame = str(item.get("time_frame") or "")
+        course_name = str(item.get("course_name") or "")
+        room = _normalize_room(item.get("classroom"))
+
+        # Lunch supervision / midday duty -> attach room to lunch break only
+        is_lunch_duty = (
+            period_order == 7
+            or "trông trưa" in period_name.lower()
+            or "trong trua" in period_name.lower()
+        )
+        if is_lunch_duty:
+            if room and "lunch" not in used_periods:
+                entries.append({"period": "lunch", "room": room})
+                used_periods.add("lunch")
+            elif course_name:
+                warnings.append({
+                    "day": day_key,
+                    "period": "lunch",
+                    "course_name": course_name,
+                    "reason": "lunch_room_only",
+                })
+            continue
+
+        slot = _PERIOD_INDEX_TO_SLOT.get(period_order)
+        if not slot:
+            if course_name:
+                warnings.append({
+                    "day": day_key,
+                    "period_index_order": period_order,
+                    "course_name": course_name,
+                    "reason": "unmapped_period",
+                })
+            continue
+
+        if slot in used_periods:
+            warnings.append({
+                "day": day_key,
+                "period": slot,
+                "course_name": course_name,
+                "reason": "duplicate_period",
+            })
+            continue
+
+        subject_id = _normalize_course_subject(course_name)
+        if not subject_id:
+            # Fallback (a): leave empty/free, warn in preview
+            if course_name:
+                warnings.append({
+                    "day": day_key,
+                    "period": slot,
+                    "course_name": course_name,
+                    "reason": "unmapped_subject",
+                })
+            continue
+
+        entry: Dict[str, Any] = {"period": slot, "subject": subject_id}
+        if room:
+            entry["room"] = room
+        entries.append(entry)
+        used_periods.add(slot)
+
+    # Keep a stable order for easier diffing/preview
+    period_rank = {"p1": 1, "p2": 2, "break1": 3, "p3": 4, "p4": 5, "p5": 6, "lunch": 7, "p6": 8, "break2": 9, "p7": 10}
+    entries.sort(key=lambda e: period_rank.get(e.get("period", ""), 99))
+    return entries, warnings
+
+
+@app.get("/api/timetable/sync")
+@rate_limit()
+def sync_timetable():
+    """Fetch and normalize the current week's timetable from VSC (silent-sync friendly)."""
+    headers, error = require_headers()
+    if error:
+        # Return non-fatal payload so frontend can stay silent
+        return jsonify({"available": False, "reason": "unauthorized"})
+
+    auth = headers.get("Authorization", "")
+    token = auth[7:] if auth.startswith("Bearer ") else auth
+    if not token:
+        return jsonify({"available": False, "reason": "unauthorized"})
+
+    anchor_date = request.args.get("date") or datetime.utcnow().strftime("%Y-%m-%d")
+    try:
+        week_dates = week_dates_for(anchor_date)
+    except Exception:
+        week_dates = week_dates_for(datetime.utcnow().strftime("%Y-%m-%d"))
+
+    try:
+        timetable: Dict[str, List[Dict[str, Any]]] = {}
+        warnings: List[Dict[str, Any]] = []
+        for day_key, ddmmyyyy in week_dates:
+            payload = fetch_vsc_timetable(token, ddmmyyyy)
+            day_entries, day_warnings = _map_timetable_day(day_key, payload)
+            timetable[day_key] = day_entries
+            warnings.extend(day_warnings)
+
+        return jsonify({
+            "available": True,
+            "week_start": week_dates[0][1] if week_dates else None,
+            "anchor_date": anchor_date,
+            "timetable": timetable,
+            "warnings": warnings,
+        })
+    except TimetableFetchError as e:
+        logger.info(f"Timetable sync unavailable: {e}")
+        return jsonify({"available": False, "reason": "upstream_unavailable"})
+    except Exception as e:
+        logger.warning(f"Timetable sync failed: {e}")
+        return jsonify({"available": False, "reason": "error"})
+
 
 @app.get("/health")
 def health_check():
