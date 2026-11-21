@@ -85,6 +85,17 @@ def _response_signals(response: requests.Response) -> Tuple[str, List[str]]:
     return title or "-", signals
 
 
+def _is_cloudflare_challenge(response: requests.Response) -> bool:
+    if response.status_code != 403:
+        return False
+    title, signals = _response_signals(response)
+    return (
+        "attention required" in title.lower()
+        or "cloudflare" in signals
+        or "captcha" in signals
+    )
+
+
 def _log_http_step(step: str, response: requests.Response, session: Optional[requests.Session] = None) -> None:
     cookie_names = ",".join(sorted(session.cookies.get_dict().keys())) if session else ""
     extra = ""
@@ -163,14 +174,39 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
         post1_url = urljoin(r1.url, action1)
         logger.info("Timetable form 1 action: %s", _redact_url(post1_url))
 
+        try:
+            step = "lti_preflight_get"
+            preflight = session.get(
+                post1_url,
+                headers={"Referer": r1.url},
+                timeout=timeout,
+            )
+            _log_http_step(step, preflight, session)
+        except requests.RequestException as exc:
+            logger.warning("Timetable preflight GET skipped: %s", type(exc).__name__)
+
+        post1_headers = {"Referer": r1.url, "Origin": _origin(r1.url)}
         step = "lti_form1_post"
-        r2 = session.post(
-            post1_url,
-            data=payload1,
-            headers={"Referer": r1.url, "Origin": _origin(r1.url)},
-            timeout=timeout,
-        )
+        r2 = session.post(post1_url, data=payload1, headers=post1_headers, timeout=timeout)
         _log_http_step(step, r2, session)
+
+        if _is_cloudflare_challenge(r2):
+            logger.warning("Timetable form 1 POST hit a Cloudflare interstitial; retrying once")
+            try:
+                step = "lti_preflight_get_retry"
+                preflight_retry = session.get(
+                    post1_url,
+                    headers={"Referer": r1.url},
+                    timeout=timeout,
+                )
+                _log_http_step(step, preflight_retry, session)
+            except requests.RequestException as exc:
+                logger.warning("Timetable preflight retry GET skipped: %s", type(exc).__name__)
+
+            step = "lti_form1_post_retry"
+            r2 = session.post(post1_url, data=payload1, headers=post1_headers, timeout=timeout)
+            _log_http_step(step, r2, session)
+
         r2.raise_for_status()
 
         # form 2 (LTI tool -> tool's own login/redirect)

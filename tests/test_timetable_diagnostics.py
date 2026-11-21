@@ -35,3 +35,21 @@ def test_response_signals_are_sanitized():
     assert "<redacted>" in title
     assert title.startswith("403 Forbidden")
     assert {"forbidden", "access_denied", "ip_blocked", "csrf"}.issubset(set(signals))
+
+
+def test_cloudflare_interstitial_is_detected():
+    response = requests.Response()
+    response.status_code = 403
+    response.encoding = "utf-8"
+    response._content = b"<html><head><title>Attention Required! | Cloudflare</title></head></html>"
+
+    assert timetable._is_cloudflare_challenge(response)
+
+
+def test_plain_forbidden_is_not_a_cloudflare_challenge():
+    response = requests.Response()
+    response.status_code = 403
+    response.encoding = "utf-8"
+    response._content = b"<html><head><title>403 Forbidden</title></head></html>"
+
+    assert not timetable._is_cloudflare_challenge(response)
