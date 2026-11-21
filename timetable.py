@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urljoin, urlparse, urlunparse
@@ -62,10 +63,36 @@ def _http_error(
     return TimetableFetchError(" ".join(parts), status_code=status)
 
 
+def _response_signals(response: requests.Response) -> Tuple[str, List[str]]:
+    """Extract safe title + keyword flags from an error page; never raw HTML."""
+    text = (response.text or "")[:200_000]
+    title_match = re.search(r"<title[^>]*>(.*?)</title>", text, re.I | re.S)
+    title = re.sub(r"\s+", " ", title_match.group(1)).strip() if title_match else ""
+    title = re.sub(r"[A-Za-z0-9_-]{32,}", "<redacted>", title)[:120]
+
+    lowered = re.sub(r"\s+", " ", text).lower()
+    checks = [
+        ("csrf", r"csrf|authenticity.token|token mismatch"),
+        ("forbidden", r"forbidden|\b403\b"),
+        ("access_denied", r"access denied|not authorized|unauthorized"),
+        ("ip_blocked", r"ip address|your ip|blocked|not allowed"),
+        ("cloudflare", r"cloudflare|attention required"),
+        ("captcha", r"captcha|challenge"),
+        ("rate_limited", r"rate limit|too many requests"),
+        ("invalid_session", r"invalid session|session expired|expired"),
+    ]
+    signals = [name for name, pattern in checks if re.search(pattern, lowered)]
+    return title or "-", signals
+
+
 def _log_http_step(step: str, response: requests.Response, session: Optional[requests.Session] = None) -> None:
     cookie_names = ",".join(sorted(session.cookies.get_dict().keys())) if session else ""
+    extra = ""
+    if response.status_code >= 400:
+        title, signals = _response_signals(response)
+        extra = f" title={title!r} signals={','.join(signals) or '-'}"
     logger.info(
-        "Timetable %s: status=%s url=%s type=%s bytes=%s server=%s cf_ray=%s cf_mitigated=%s cookies=%s",
+        "Timetable %s: status=%s url=%s type=%s bytes=%s server=%s cf_ray=%s cf_mitigated=%s cookies=%s%s",
         step,
         response.status_code,
         _redact_url(response.url),
@@ -75,6 +102,7 @@ def _log_http_step(step: str, response: requests.Response, session: Optional[req
         response.headers.get("Cf-Ray", ""),
         response.headers.get("Cf-Mitigated", ""),
         cookie_names,
+        extra,
     )
 
 
