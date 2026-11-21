@@ -1853,12 +1853,12 @@ body.light .item_row_important {
     display: none !important;
 }
 
-.timetable_sync_bar {
+.timetable_header_left {
+    position: absolute;
+    top: 0;
+    left: 0;
     display: flex;
     align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin: 0 0 12px 0;
 }
 
 .timetable_sync_btn {
@@ -1897,9 +1897,8 @@ body.light .item_row_important {
 .timetable_sync_status {
     display: flex;
     align-items: center;
-    flex: 1 1 auto;
     gap: 8px;
-    margin: 0;
+    margin: 0 0 12px 0;
     padding: 10px 12px;
     border: 1px solid var(--border-pill);
     border-radius: var(--radius-sm);
@@ -2760,9 +2759,16 @@ body.light .theme_icon_moon {
         flex-wrap: wrap;
     }
 
+    .timetable_header_left {
+        position: static;
+        justify-content: flex-start;
+        width: 100%;
+    }
+
     .timetable_title_section {
         text-align: center;
         padding-right: 0;
+        width: 100%;
     }
 
     .timetable_header_actions {

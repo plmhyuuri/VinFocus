@@ -1538,7 +1538,13 @@ def _normalize_course_subject(course_name: str) -> Optional[str]:
         return "PHY"
     if "sinh học" in lower or "sinh hoc" in lower:
         return "BIO"
-    if "tin học" in lower or "tin hoc" in lower:
+    if (
+        "công nghệ thông tin" in lower
+        or "cong nghe thong tin" in lower
+        or "cntt" in lower
+        or "tin học" in lower
+        or "tin hoc" in lower
+    ):
         return "IT"
     if "công nghệ" in lower or "cong nghe" in lower:
         return "TECH"

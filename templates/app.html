@@ -328,6 +328,11 @@
             <main id="timetable_view" class="app_view">
             <div class="card timetable_container">
                 <div class="timetable_header">
+                    <div class="timetable_header_left">
+                        <button id="timetable_sync_btn" type="button" class="timetable_sync_btn" aria-label="Sync from VSC" title="Sync from VSC">
+                            <span class="timetable_sync_btn_text" id="timetable_sync_btn_text">Sync from VSC</span>
+                        </button>
+                    </div>
                     <div class="timetable_title_section">
                         <h2 id="timetable_title">Weekly Timetable</h2>
                         <p id="timetable_note" class="timetable_note">Manual schedule stored locally in this app.</p>
@@ -346,12 +351,7 @@
                     </div>
                 </div>
 
-                <div class="timetable_sync_bar">
-                    <button id="timetable_sync_btn" type="button" class="timetable_sync_btn" aria-label="Sync from VSC" title="Sync from VSC">
-                        <span class="timetable_sync_btn_text" id="timetable_sync_btn_text">Sync from VSC</span>
-                    </button>
-                    <div id="timetable_sync_status" class="timetable_sync_status" role="status" aria-live="polite" hidden></div>
-                </div>
+                <div id="timetable_sync_status" class="timetable_sync_status" role="status" aria-live="polite" hidden></div>
 
                 <div id="timetable_view_toggle" class="timetable_view_toggle">
                     <button type="button" class="timetable_view_toggle_btn timetable_view_toggle_btn_active" data-view="today">Today</button>
