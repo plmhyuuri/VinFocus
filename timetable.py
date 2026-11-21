@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse, urlunparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -34,14 +34,69 @@ def _form_payload(form) -> Tuple[str, Dict[str, str]]:
     return action, payload
 
 
+def _redact_url(url: str) -> str:
+    """Strip query strings and fragments so signed LTI params are never logged."""
+    parsed = urlparse(url or "")
+    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", "", ""))
+
+
+def _origin(url: str) -> str:
+    parsed = urlparse(url or "")
+    return f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else ""
+
+
+def _http_error(
+    step: str,
+    exc: requests.RequestException,
+    action: str = "Timetable launch",
+) -> TimetableFetchError:
+    """Build a sanitized error; HTTPError strings include signed launch URLs."""
+    response = getattr(exc, "response", None)
+    status = response.status_code if response is not None else None
+    url = _redact_url(response.url) if response is not None else ""
+    parts = [f"{action} failed at {step}", type(exc).__name__]
+    if status is not None:
+        parts.append(f"status {status}")
+    if url:
+        parts.append(f"url {url}")
+    return TimetableFetchError(" ".join(parts), status_code=status)
+
+
+def _log_http_step(step: str, response: requests.Response, session: Optional[requests.Session] = None) -> None:
+    cookie_names = ",".join(sorted(session.cookies.get_dict().keys())) if session else ""
+    logger.info(
+        "Timetable %s: status=%s url=%s type=%s bytes=%s server=%s cf_ray=%s cf_mitigated=%s cookies=%s",
+        step,
+        response.status_code,
+        _redact_url(response.url),
+        response.headers.get("Content-Type", ""),
+        len(response.content or b""),
+        response.headers.get("Server", ""),
+        response.headers.get("Cf-Ray", ""),
+        response.headers.get("Cf-Mitigated", ""),
+        cookie_names,
+    )
+
+
 def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple[str, requests.Session]:
     """Run the full LTI launch and return (ltik, session)."""
     if not canvas_token:
         raise TimetableFetchError("Missing Canvas token")
 
     session = requests.Session()
+    session.headers.update({
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Upgrade-Insecure-Requests": "1",
+    })
     headers = {"Authorization": f"Bearer {canvas_token}"}
 
+    step = "canvas_sessionless_launch"
     try:
         launch_res = session.get(
             f"{BASE_URL}/api/v1/accounts/1/external_tools/sessionless_launch",
@@ -49,8 +104,9 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
             headers=headers,
             timeout=timeout,
         )
+        _log_http_step(step, launch_res, session)
     except requests.RequestException as exc:
-        raise TimetableFetchError(f"Failed to start timetable launch: {exc}") from exc
+        raise _http_error(step, exc, "Canvas launch") from exc
 
     if launch_res.status_code != 200:
         raise TimetableFetchError(
@@ -64,16 +120,29 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
         raise TimetableFetchError("Invalid launch response from Canvas") from exc
     if not launch_url:
         raise TimetableFetchError("Canvas did not return a timetable launch URL")
+    logger.info("Timetable launch URL: %s", _redact_url(launch_url))
 
     try:
         # form 1 (Canvas -> LTI tool)
+        step = "lti_form1_get"
         r1 = session.get(launch_url, timeout=timeout)
+        _log_http_step(step, r1, session)
         r1.raise_for_status()
         form1 = BeautifulSoup(r1.text, "html.parser").find("form")
         if not form1:
             raise TimetableFetchError("Timetable launch step 1 did not return a form")
         action1, payload1 = _form_payload(form1)
-        r2 = session.post(urljoin(r1.url, action1), data=payload1, timeout=timeout)
+        post1_url = urljoin(r1.url, action1)
+        logger.info("Timetable form 1 action: %s", _redact_url(post1_url))
+
+        step = "lti_form1_post"
+        r2 = session.post(
+            post1_url,
+            data=payload1,
+            headers={"Referer": r1.url, "Origin": _origin(r1.url)},
+            timeout=timeout,
+        )
+        _log_http_step(step, r2, session)
         r2.raise_for_status()
 
         # form 2 (LTI tool -> tool's own login/redirect)
@@ -81,15 +150,27 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
         if not form2:
             raise TimetableFetchError("Timetable launch step 2 did not return a form")
         action2, payload2 = _form_payload(form2)
-        final_resp = session.post(urljoin(r2.url, action2), data=payload2, timeout=timeout)
+        post2_url = urljoin(r2.url, action2)
+        logger.info("Timetable form 2 action: %s", _redact_url(post2_url))
+
+        step = "lti_form2_post"
+        final_resp = session.post(
+            post2_url,
+            data=payload2,
+            headers={"Referer": r2.url, "Origin": _origin(r2.url)},
+            timeout=timeout,
+        )
+        _log_http_step(step, final_resp, session)
         final_resp.raise_for_status()
     except requests.RequestException as exc:
-        raise TimetableFetchError(f"Timetable launch failed: {exc}") from exc
+        raise _http_error(step, exc) from exc
 
     ltik = parse_qs(urlparse(final_resp.url).query).get("ltik", [None])[0]
     if not ltik:
+        logger.warning("Timetable launch produced no ltik: %s", _redact_url(final_resp.url))
         raise TimetableFetchError("Timetable launch did not produce an access token")
 
+    logger.info("Timetable launch completed: %s", _redact_url(final_resp.url))
     return ltik, session
 
 
@@ -103,8 +184,9 @@ def get_timetable(canvas_token: str, date: str, timeout: int = DEFAULT_TIMEOUT) 
             headers={"Authorization": f"Bearer {ltik}"},
             timeout=timeout,
         )
+        _log_http_step("vsc_timetable_fetch", response, session)
     except requests.RequestException as exc:
-        raise TimetableFetchError(f"Failed to fetch timetable: {exc}") from exc
+        raise _http_error("vsc_timetable_fetch", exc, "Timetable fetch") from exc
 
     if response.status_code != 200:
         raise TimetableFetchError(
