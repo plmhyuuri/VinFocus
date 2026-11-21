@@ -1853,6 +1853,86 @@ body.light .item_row_important {
     display: none !important;
 }
 
+.timetable_sync_bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0 0 12px 0;
+}
+
+.timetable_sync_btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--accent);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-all-fast);
+    min-height: 36px;
+    white-space: nowrap;
+}
+
+.timetable_sync_btn:hover:not(:disabled) {
+    background: var(--accent);
+    color: var(--btn-white);
+}
+
+.timetable_sync_btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.timetable_sync_btn:disabled {
+    opacity: 0.75;
+    cursor: progress;
+}
+
+.timetable_sync_status {
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    gap: 8px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border-pill);
+    border-radius: var(--radius-sm);
+    background: var(--bg-pill);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.timetable_sync_status[hidden] {
+    display: none !important;
+}
+
+.timetable_sync_status_loading {
+    color: var(--accent);
+}
+
+.timetable_sync_btn_loading::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    flex: none;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: timetable-sync-spin 0.7s linear infinite;
+}
+
+@keyframes timetable-sync-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .timetable_edit_btn {
     position: absolute;
     top: 0;

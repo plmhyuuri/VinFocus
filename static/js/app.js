@@ -29,6 +29,9 @@ const tagline = document.getElementById("tagline");
 const timetableTitle = document.getElementById("timetable_title");
 const timetableNote = document.getElementById("timetable_note");
 const timetableHeader = document.querySelector(".timetable_header");
+const timetableSyncBtn = document.getElementById("timetable_sync_btn");
+const timetableSyncBtnText = document.getElementById("timetable_sync_btn_text");
+const timetableSyncStatus = document.getElementById("timetable_sync_status");
 const subjectLabelEditBtn = document.getElementById("subject_label_edit_btn");
 
 const VINFOCUS_SCRIPT_VERSION = "1.7.5";
@@ -270,9 +273,12 @@ const TRANSLATIONS = {
     loadExampleSchedule: "Load Example Schedule",
     loadExampleConfirm: "Replace your current timetable with the example schedule?",
     timetableEmptyHint: "Your timetable is empty. Press the pencil to add your classes, or load the example schedule while editing.",
-    timetableSyncAvailable: "A new timetable is available from VSC.",
-    timetableSyncReview: "Review & apply",
-    timetableSyncDismiss: "Dismiss",
+    timetableSyncButton: "Sync from VSC",
+    timetableSyncing: "Reading this week’s VSC timetable…",
+    timetableSyncReady: "Timetable gathered. Review the changes before applying.",
+    timetableSyncNoChange: "Your timetable is already up to date.",
+    timetableSyncNeedToken: "Connect your Canvas token before syncing.",
+    timetableSyncError: "Could not gather the timetable from VSC.",
     timetableSyncPreviewTitle: "Timetable update from VSC",
     timetableSyncPreviewDesc: "Review the imported week below. Applying will replace your current timetable.",
     timetableSyncApply: "Apply (replace all)",
@@ -515,9 +521,12 @@ const TRANSLATIONS = {
     loadExampleSchedule: "Tải Lịch Mẫu",
     loadExampleConfirm: "Thay thế thời khóa biểu hiện tại bằng lịch mẫu?",
     timetableEmptyHint: "Thời khóa biểu của bạn đang trống. Bấm bút chì để thêm lớp học, hoặc tải lịch mẫu khi đang chỉnh sửa.",
-    timetableSyncAvailable: "Có thời khóa biểu mới từ VSC.",
-    timetableSyncReview: "Xem & áp dụng",
-    timetableSyncDismiss: "Bỏ qua",
+    timetableSyncButton: "Đồng bộ từ VSC",
+    timetableSyncing: "Đang đọc thời khóa biểu VSC của tuần này…",
+    timetableSyncReady: "Đã lấy thời khóa biểu. Xem các thay đổi trước khi áp dụng.",
+    timetableSyncNoChange: "Thời khóa biểu của bạn đã mới.",
+    timetableSyncNeedToken: "Hãy kết nối mã Canvas trước khi đồng bộ.",
+    timetableSyncError: "Không thể lấy thời khóa biểu từ VSC.",
     timetableSyncPreviewTitle: "Cập nhật thời khóa biểu từ VSC",
     timetableSyncPreviewDesc: "Xem trước tuần được nhập bên dưới. Áp dụng sẽ thay thế thời khóa biểu hiện tại.",
     timetableSyncApply: "Áp dụng (thay thế tất cả)",
@@ -3150,11 +3159,35 @@ function loadExampleSchedule() {
   renderTimetable(true);
 }
 
-// ── Timetable sync (silent, VSC) ───────────────────────────────
+// ── Timetable sync (manual, VSC) ───────────────────────────────
 
 let _pendingTimetableSync = null;
 let _timetableSyncInFlight = false;
 let _lastTimetableSyncPromptKey = null;
+
+function setTimetableSyncLoading(loading) {
+  if (!timetableSyncBtn) return;
+  timetableSyncBtn.disabled = loading;
+  timetableSyncBtn.classList.toggle("timetable_sync_btn_loading", loading);
+  timetableSyncBtn.setAttribute("aria-busy", String(loading));
+  const label = t("timetableSyncButton");
+  timetableSyncBtn.setAttribute("aria-label", label);
+  timetableSyncBtn.title = label;
+}
+
+function showTimetableSyncStatus(message, loading = false) {
+  if (!timetableSyncStatus) return;
+  timetableSyncStatus.textContent = message;
+  timetableSyncStatus.classList.toggle("timetable_sync_status_loading", loading);
+  timetableSyncStatus.hidden = false;
+}
+
+function hideTimetableSyncStatus() {
+  if (!timetableSyncStatus) return;
+  timetableSyncStatus.textContent = "";
+  timetableSyncStatus.classList.remove("timetable_sync_status_loading");
+  timetableSyncStatus.hidden = true;
+}
 
 function localDateISO(d = new Date()) {
   const y = d.getFullYear();
@@ -3186,48 +3219,6 @@ function timetableFingerprint(timetable) {
   } catch {
     return "";
   }
-}
-
-function dismissTimetableSyncBanner() {
-  const banner = document.getElementById("timetable_sync_banner");
-  if (banner) banner.remove();
-}
-
-function showTimetableSyncBanner() {
-  dismissTimetableSyncBanner();
-  if (!_pendingTimetableSync) return;
-
-  const container = document.querySelector("#timetable_view .timetable_container") || document.getElementById("timetable_view");
-  if (!container) return;
-
-  const banner = document.createElement("div");
-  banner.id = "timetable_sync_banner";
-  banner.className = "token_warning";
-  banner.style.position = "static";
-  banner.style.margin = "0 0 12px 0";
-
-  const text = document.createElement("span");
-  text.className = "token_warning_text";
-  text.textContent = t("timetableSyncAvailable");
-
-  const reviewBtn = document.createElement("button");
-  reviewBtn.type = "button";
-  reviewBtn.className = "token_warning_btn";
-  reviewBtn.textContent = t("timetableSyncReview");
-  reviewBtn.addEventListener("click", () => openTimetableSyncPreview());
-
-  const dismissBtn = document.createElement("button");
-  dismissBtn.type = "button";
-  dismissBtn.className = "token_warning_dismiss";
-  dismissBtn.setAttribute("aria-label", t("timetableSyncDismiss"));
-  dismissBtn.textContent = "✕";
-  dismissBtn.addEventListener("click", () => {
-    _pendingTimetableSync = null;
-    dismissTimetableSyncBanner();
-  });
-
-  banner.append(text, reviewBtn, dismissBtn);
-  container.insertBefore(banner, container.firstChild);
 }
 
 function formatSyncWarning(w) {
@@ -3339,7 +3330,7 @@ function openTimetableSyncPreview() {
     saveTimetable(TIMETABLE);
     _pendingTimetableSync = null;
     modal.remove();
-    dismissTimetableSyncBanner();
+    hideTimetableSyncStatus();
     renderTimetable(true);
   });
 
@@ -3350,7 +3341,7 @@ function openTimetableSyncPreview() {
   cancelBtn.addEventListener("click", () => {
     _pendingTimetableSync = null;
     modal.remove();
-    dismissTimetableSyncBanner();
+    hideTimetableSyncStatus();
   });
 
   actions.append(applyBtn, cancelBtn);
@@ -3358,29 +3349,47 @@ function openTimetableSyncPreview() {
   modal.appendChild(content);
   modal.addEventListener("click", (e) => {
     if (e.target === modal) {
+      _pendingTimetableSync = null;
       modal.remove();
+      hideTimetableSyncStatus();
     }
   });
   document.body.appendChild(modal);
 }
 
 async function syncTimetableFromVSC(options = {}) {
-  const { force = false } = options;
-  if (_timetableSyncInFlight) return;
+  const { force = false, manual = false } = options;
+  if (_timetableSyncInFlight) return { ok: false, reason: "in_flight" };
 
   const token = getToken ? getToken() : (storageGet("canvasToken") || "");
-  if (!token) return;
+  if (!token) {
+    if (manual) showTimetableSyncStatus(t("timetableSyncNeedToken"));
+    return { ok: false, reason: "unauthorized" };
+  }
 
   _timetableSyncInFlight = true;
+  if (manual) {
+    _pendingTimetableSync = null;
+    hideTimetableSyncStatus();
+    setTimetableSyncLoading(true);
+    showTimetableSyncStatus(t("timetableSyncing"), true);
+  }
+
   try {
     const date = localDateISO(new Date());
     const response = await fetch(`/api/timetable/sync?date=${encodeURIComponent(date)}`, {
       headers: { "Authorization": `Bearer ${token}` },
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+      if (manual) showTimetableSyncStatus(t("timetableSyncError"));
+      return { ok: false, reason: `http_${response.status}` };
+    }
 
     const data = await response.json().catch(() => null);
-    if (!data || !data.available || !data.timetable) return;
+    if (!data || !data.available || !data.timetable) {
+      if (manual) showTimetableSyncStatus(t("timetableSyncError"));
+      return { ok: false, reason: data?.reason || "unavailable" };
+    }
 
     const incoming = normalizeTimetableShape(data.timetable);
     const incomingFp = timetableFingerprint(incoming);
@@ -3389,26 +3398,28 @@ async function syncTimetableFromVSC(options = {}) {
 
     if (incomingFp === currentFp) {
       _pendingTimetableSync = null;
-      dismissTimetableSyncBanner();
-      return;
+      hideTimetableSyncStatus();
+      if (manual) showTimetableSyncStatus(t("timetableSyncNoChange"));
+      return { ok: true, changed: false };
     }
     if (!force && _lastTimetableSyncPromptKey === promptKey) {
-      return;
+      if (manual) showTimetableSyncStatus(t("timetableSyncNoChange"));
+      return { ok: true, changed: false };
     }
 
     _pendingTimetableSync = { timetable: incoming, warnings: data.warnings || [], week_start: data.week_start };
     _lastTimetableSyncPromptKey = promptKey;
-    showTimetableSyncBanner();
+    openTimetableSyncPreview();
+    if (manual) showTimetableSyncStatus(t("timetableSyncReady"));
+    return { ok: true, changed: true };
   } catch (err) {
-    debugLog("Timetable sync skipped:", err);
+    debugLog("Timetable sync failed:", err);
+    if (manual) showTimetableSyncStatus(t("timetableSyncError"));
+    return { ok: false, reason: "error" };
   } finally {
     _timetableSyncInFlight = false;
+    if (manual) setTimetableSyncLoading(false);
   }
-}
-
-function triggerTimetableSync() {
-  // Silent automatic sync on timetable view open
-  syncTimetableFromVSC().catch(() => {});
 }
 
 function isMobile() {
@@ -4061,6 +4072,11 @@ function renderTimetableView() {
   if (timetableOpenBtnText) timetableOpenBtnText.textContent = t("openTimetable");
   const timetableExampleBtnText = document.getElementById("timetable_example_btn_text");
   if (timetableExampleBtnText) timetableExampleBtnText.textContent = t("loadExampleSchedule");
+  if (timetableSyncBtnText) timetableSyncBtnText.textContent = t("timetableSyncButton");
+  if (timetableSyncBtn) {
+    timetableSyncBtn.setAttribute("aria-label", t("timetableSyncButton"));
+    timetableSyncBtn.title = t("timetableSyncButton");
+  }
   const timetableEmptyHint = document.getElementById("timetable_empty_hint");
   if (timetableEmptyHint) timetableEmptyHint.textContent = t("timetableEmptyHint");
 }
@@ -4202,7 +4218,6 @@ function setView(viewName) {
       }
     } else if (nextView === "timetable") {
       renderTimetable();
-      triggerTimetableSync();
     }
   };
 
@@ -4392,6 +4407,12 @@ if (timetableEditBtn) {
 const timetableExampleBtn = document.getElementById("timetable_example_btn");
 if (timetableExampleBtn) {
   timetableExampleBtn.addEventListener("click", loadExampleSchedule);
+}
+
+if (timetableSyncBtn) {
+  timetableSyncBtn.addEventListener("click", () => {
+    syncTimetableFromVSC({ force: true, manual: true }).catch(() => {});
+  });
 }
 
 // Mobile timetable view toggle (Today/Full Week)
