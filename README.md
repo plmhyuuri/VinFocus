@@ -284,6 +284,7 @@ python tests/test_fixes.py
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `API_TOKEN` | — | Optional Canvas API token for local development/testing |
+| `ALLOWED_CANVAS_USER_ID` | — | Optional numeric Canvas user ID allowed to use VSC timetable sync. Recommended when the hosted app is public and sync uses a personal relay. |
 | `DATABASE_URL` | — | PostgreSQL database URL (for feedback feature) |
 | `ADMIN_API_KEY` | — | Secret key for accessing feedback data. On Render, this is auto-generated. |
 | `FLASK_DEBUG` | `"false"` | Enable Flask debug mode |
@@ -301,6 +302,11 @@ the local relay + Cloudflare Tunnel setup, which uses your home IP.
 For the separate local relay process, see `LOCAL_RELAY.md`. It reads
 `RELAY_KEY` and `RELAY_PORT`, not the Flask app's environment.
 
+If the deployed app is reachable by other people, set `ALLOWED_CANVAS_USER_ID`
+to your own Canvas user ID. Only that account can then trigger a VSC sync, so
+other users cannot send traffic through your personal relay. When it is unset,
+any valid Canvas token can call the sync endpoint.
+
 ## Deployment
 
 VinFocus was previously deployed on Render.
@@ -314,7 +320,6 @@ maintained for local, single-user use only.
 VinFocus is still developed by the author for personal use; it is not maintained for
 distribution or public deployment.
 
-- Automatic timetable import from VSC Timetable (a demo exists but it is currently being developed)
 - Cross-course global search (experimental)
 
 ## Notes

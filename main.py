@@ -136,12 +136,13 @@ _csrf_token_lock = threading.Lock()
 
 
 def get_client_ip() -> str:
-    """Get the real client IP address, handling Render's proxy headers.
-    
-    Render sends the real client IP in the X-Forwarded-For header.
-    Falls back to remote_addr if the header is not present.
+    """Get the real client IP address from the hosting platform's proxy headers.
+
+    Render puts the client first in X-Forwarded-For. Vercel overwrites the
+    header at the edge and does not forward client-supplied values, so the
+    first entry is trustworthy on both platforms.
     """
-    # Check X-Forwarded-For header (set by Render's proxy)
+    # Check X-Forwarded-For header (set by Render/Vercel's proxy)
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
         # X-Forwarded-For can contain multiple IPs (client, proxy1, proxy2, ...)
@@ -1666,6 +1667,30 @@ def _map_timetable_day(day_key: str, payload: Dict[str, Any]) -> Tuple[List[Dict
     return entries, warnings
 
 
+def _timetable_owner_allowed(token: str) -> bool:
+    """Return whether this token belongs to the configured timetable owner.
+
+    Set ALLOWED_CANVAS_USER_ID to restrict VSC timetable sync to one Canvas
+    account. This prevents a public deployment from using a personal home relay
+    with other people's tokens. When the variable is unset, the check is skipped.
+    """
+    expected_id = (os.getenv("ALLOWED_CANVAS_USER_ID") or "").strip()
+    if not expected_id:
+        return True
+
+    valid, user_info = validate_canvas_token(token)
+    if not valid or not isinstance(user_info, dict):
+        logger.warning("Timetable sync owner check failed: token could not be validated")
+        return False
+
+    actual_id = str(user_info.get("id", "")).strip()
+    if actual_id != expected_id:
+        logger.warning("Timetable sync rejected: token is not the configured owner")
+        return False
+
+    return True
+
+
 @app.get("/api/timetable/sync")
 @rate_limit()
 def sync_timetable():
@@ -1679,6 +1704,9 @@ def sync_timetable():
     token = auth[7:] if auth.startswith("Bearer ") else auth
     if not token:
         return jsonify({"available": False, "reason": "unauthorized"})
+
+    if not _timetable_owner_allowed(token):
+        return jsonify({"available": False, "reason": "forbidden"})
 
     anchor_date = request.args.get("date") or datetime.utcnow().strftime("%Y-%m-%d")
     try:

@@ -136,6 +136,22 @@ leaving through your home IP. Check that:
 - The VSC tool's short-lived `ltik` token does pass through the relay for the
   final timetable fetch. That token is not the Canvas API token.
 
+### Restrict sync to your Canvas account
+
+If other people can reach the hosted app, set `ALLOWED_CANVAS_USER_ID` in the
+hosted app's environment (for example in Vercel) to your numeric Canvas user ID
+and redeploy. The sync endpoint then validates the token against Canvas
+`/api/v1/users/self` and rejects other accounts **before** contacting the
+relay. When the variable is unset, any valid Canvas token can use the relay.
+
+Find your user ID with:
+
+```bash
+curl -sS -H "Authorization: Bearer <your-canvas-token>" \
+  https://lms.vinschool.edu.vn/api/v1/users/self \
+  | python -c "import sys, json; print(json.load(sys.stdin)['id'])"
+```
+
 ## Troubleshooting
 
 | Symptom | Cause |
@@ -145,9 +161,10 @@ leaving through your home IP. Check that:
 | `502 upstream_fetch_failed` | Your machine could not reach VSC, or the request timed out |
 | `403 Attention Required!` from VSC | The request is not using your home IP; verify the tunnel URL and redeploy |
 | Tunnel works, sync still fails | Check that Vercel was redeployed after setting the env vars |
+| Sync fails after setting `ALLOWED_CANVAS_USER_ID` | The value does not match your Canvas user ID; check `/api/v1/users/self` |
 
 ## Worker relay
 
-The Cloudflare Worker in `worker/` is no longer needed for this setup. You can
-keep it deployed or delete it. The local relay speaks the same protocol, so
-switching between them only requires changing `TIMETABLE_RELAY_URL`.
+The Cloudflare Worker in `worker/` is not used in this setup and its deployment
+can be deleted. The local relay speaks the same protocol, so switching between
+them only requires changing `TIMETABLE_RELAY_URL`.
