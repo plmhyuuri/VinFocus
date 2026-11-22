@@ -3,9 +3,24 @@ import requests
 import timetable
 
 
-def test_redact_url_removes_query_and_fragment():
-    url = "https://host/login?token=SECRET&ltik=ABC#fragment"
+def test_redact_url_removes_query_fragment_and_credentials():
+    url = "https://user:secret@host/login?token=SECRET&ltik=ABC#fragment"
     assert timetable._redact_url(url) == "https://host/login"
+
+
+def test_safe_error_detail_hides_proxy_and_signed_urls():
+    exc = requests.exceptions.ProxyError(
+        "Unable to connect to proxy http://user:secret@proxy.example:3128 "
+        "for https://host/login?ltik=SECRET"
+    )
+
+    detail = timetable._safe_error_detail(exc)
+
+    assert "secret" not in detail
+    assert "SECRET" not in detail
+    assert "user:secret@" not in detail
+    assert "http://proxy.example:3128" in detail
+    assert "https://host/login" in detail
 
 
 def test_http_error_redacts_signed_url():

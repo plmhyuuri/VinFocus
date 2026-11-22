@@ -39,9 +39,10 @@ def _form_payload(form) -> Tuple[str, Dict[str, str]]:
 
 
 def _redact_url(url: str) -> str:
-    """Strip query strings and fragments so signed LTI params are never logged."""
+    """Strip credentials, query strings, and fragments so signed params are never logged."""
     parsed = urlparse(url or "")
-    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", "", ""))
+    netloc = parsed.netloc.rsplit("@", 1)[-1]
+    return urlunparse((parsed.scheme, netloc, parsed.path, "", "", ""))
 
 
 def _origin(url: str) -> str:
@@ -91,6 +92,12 @@ def _http_error(
     if url:
         parts.append(f"url {url}")
     return TimetableFetchError(" ".join(parts), status_code=status)
+
+
+def _safe_error_detail(exc: Exception) -> str:
+    """Keep proxy/network diagnostics without exposing credentials or signed URLs."""
+    detail = re.sub(r"https?://[^\s)]+", lambda match: _redact_url(match.group(0)), str(exc))
+    return re.sub(r"\s+", " ", detail)[:400]
 
 
 def _response_signals(response: requests.Response) -> Tuple[str, List[str]]:
@@ -177,6 +184,12 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
         )
         _log_http_step(step, launch_res, session)
     except requests.RequestException as exc:
+        logger.warning(
+            "Timetable %s failed: %s: %s",
+            step,
+            type(exc).__name__,
+            _safe_error_detail(exc),
+        )
         raise _http_error(step, exc, "Canvas launch") from exc
 
     if launch_res.status_code != 200:
@@ -206,17 +219,24 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
         post1_url = urljoin(r1.url, action1)
         logger.info("Timetable form 1 action: %s", _redact_url(post1_url))
 
-        try:
-            step = "lti_preflight_get"
-            preflight = session.get(
-                post1_url,
-                headers={"Referer": r1.url},
-                proxies=_proxies_for_url(post1_url, tool_proxies),
-                timeout=timeout,
-            )
-            _log_http_step(step, preflight, session)
-        except requests.RequestException as exc:
-            logger.warning("Timetable preflight GET skipped: %s", type(exc).__name__)
+        if tool_proxies:
+            logger.info("Timetable preflight GET skipped: proxy configured")
+        else:
+            try:
+                step = "lti_preflight_get"
+                preflight = session.get(
+                    post1_url,
+                    headers={"Referer": r1.url},
+                    proxies=_proxies_for_url(post1_url, tool_proxies),
+                    timeout=timeout,
+                )
+                _log_http_step(step, preflight, session)
+            except requests.RequestException as exc:
+                logger.warning(
+                    "Timetable preflight GET skipped: %s: %s",
+                    type(exc).__name__,
+                    _safe_error_detail(exc),
+                )
 
         post1_headers = {"Referer": r1.url, "Origin": _origin(r1.url)}
         step = "lti_form1_post"
@@ -231,17 +251,24 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
 
         if _is_cloudflare_challenge(r2):
             logger.warning("Timetable form 1 POST hit a Cloudflare interstitial; retrying once")
-            try:
-                step = "lti_preflight_get_retry"
-                preflight_retry = session.get(
-                    post1_url,
-                    headers={"Referer": r1.url},
-                    proxies=_proxies_for_url(post1_url, tool_proxies),
-                    timeout=timeout,
-                )
-                _log_http_step(step, preflight_retry, session)
-            except requests.RequestException as exc:
-                logger.warning("Timetable preflight retry GET skipped: %s", type(exc).__name__)
+            if tool_proxies:
+                logger.info("Timetable preflight retry GET skipped: proxy configured")
+            else:
+                try:
+                    step = "lti_preflight_get_retry"
+                    preflight_retry = session.get(
+                        post1_url,
+                        headers={"Referer": r1.url},
+                        proxies=_proxies_for_url(post1_url, tool_proxies),
+                        timeout=timeout,
+                    )
+                    _log_http_step(step, preflight_retry, session)
+                except requests.RequestException as exc:
+                    logger.warning(
+                        "Timetable preflight retry GET skipped: %s: %s",
+                        type(exc).__name__,
+                        _safe_error_detail(exc),
+                    )
 
             step = "lti_form1_post_retry"
             r2 = session.post(
@@ -274,6 +301,12 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
         _log_http_step(step, final_resp, session)
         final_resp.raise_for_status()
     except requests.RequestException as exc:
+        logger.warning(
+            "Timetable %s failed: %s: %s",
+            step,
+            type(exc).__name__,
+            _safe_error_detail(exc),
+        )
         raise _http_error(step, exc) from exc
 
     ltik = parse_qs(urlparse(final_resp.url).query).get("ltik", [None])[0]
@@ -299,6 +332,11 @@ def get_timetable(canvas_token: str, date: str, timeout: int = DEFAULT_TIMEOUT) 
         )
         _log_http_step("vsc_timetable_fetch", response, session)
     except requests.RequestException as exc:
+        logger.warning(
+            "Timetable vsc_timetable_fetch failed: %s: %s",
+            type(exc).__name__,
+            _safe_error_detail(exc),
+        )
         raise _http_error("vsc_timetable_fetch", exc, "Timetable fetch") from exc
 
     if response.status_code != 200:
