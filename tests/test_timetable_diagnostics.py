@@ -53,3 +53,47 @@ def test_plain_forbidden_is_not_a_cloudflare_challenge():
     response._content = b"<html><head><title>403 Forbidden</title></head></html>"
 
     assert not timetable._is_cloudflare_challenge(response)
+
+
+def test_tool_proxies_reads_env(monkeypatch):
+    monkeypatch.setenv(timetable.TOOL_PROXY_ENV, "http://127.0.0.1:3128")
+
+    assert timetable._tool_proxies() == {
+        "http": "http://127.0.0.1:3128",
+        "https": "http://127.0.0.1:3128",
+    }
+
+
+def test_tool_proxies_disabled_without_env(monkeypatch):
+    monkeypatch.delenv(timetable.TOOL_PROXY_ENV, raising=False)
+
+    assert timetable._tool_proxies() is None
+
+
+def test_tool_proxies_rejects_invalid_url(monkeypatch):
+    monkeypatch.setenv(timetable.TOOL_PROXY_ENV, "127.0.0.1:3128")
+
+    assert timetable._tool_proxies() is None
+
+
+def test_proxies_only_apply_to_tool_host():
+    proxies = {"http": "http://127.0.0.1:3128", "https": "http://127.0.0.1:3128"}
+
+    assert timetable._proxies_for_url(
+        "https://lms-lti-timetables.vinschool.edu.vn/login",
+        proxies,
+    ) == proxies
+    assert timetable._proxies_for_url(
+        "https://lms.vinschool.edu.vn/accounts/1/external_tools/236",
+        proxies,
+    ) is None
+
+
+def test_proxy_label_hides_credentials():
+    label = timetable._proxy_label({
+        "http": "http://user:secret@proxy.example:3128",
+        "https": "http://user:secret@proxy.example:3128",
+    })
+
+    assert label == "proxy.example:3128"
+    assert "secret" not in label

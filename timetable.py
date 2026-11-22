@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -11,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://lms.vinschool.edu.vn"
 TIMETABLE_TOOL_URL = "https://lms-lti-timetables.vinschool.edu.vn/gettimetable"
+TIMETABLE_TOOL_HOST = urlparse(TIMETABLE_TOOL_URL).hostname or ""
+TOOL_PROXY_ENV = "TIMETABLE_PROXY_URL"
 EXTERNAL_TOOL_ID = 236
 DEFAULT_TIMEOUT = 20
 
@@ -44,6 +47,33 @@ def _redact_url(url: str) -> str:
 def _origin(url: str) -> str:
     parsed = urlparse(url or "")
     return f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else ""
+
+
+def _tool_proxies() -> Optional[Dict[str, str]]:
+    proxy_url = (os.getenv(TOOL_PROXY_ENV) or "").strip()
+    if not proxy_url:
+        return None
+    parsed = urlparse(proxy_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        logger.warning("Ignoring invalid %s value", TOOL_PROXY_ENV)
+        return None
+    return {"http": proxy_url, "https": proxy_url}
+
+
+def _proxy_label(proxies: Optional[Dict[str, str]]) -> str:
+    if not proxies:
+        return "disabled"
+    parsed = urlparse(proxies.get("https") or proxies.get("http") or "")
+    host = parsed.hostname or ""
+    port = f":{parsed.port}" if parsed.port else ""
+    return f"{host}{port}" if host else "configured"
+
+
+def _proxies_for_url(url: str, proxies: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
+    """Use the relay only for the VSC tool host, never for Canvas."""
+    if not proxies:
+        return None
+    return proxies if urlparse(url or "").hostname == TIMETABLE_TOOL_HOST else None
 
 
 def _http_error(
@@ -134,6 +164,8 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
         "Upgrade-Insecure-Requests": "1",
     })
     headers = {"Authorization": f"Bearer {canvas_token}"}
+    tool_proxies = _tool_proxies()
+    logger.info("Timetable tool proxy: %s", _proxy_label(tool_proxies))
 
     step = "canvas_sessionless_launch"
     try:
@@ -179,6 +211,7 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
             preflight = session.get(
                 post1_url,
                 headers={"Referer": r1.url},
+                proxies=_proxies_for_url(post1_url, tool_proxies),
                 timeout=timeout,
             )
             _log_http_step(step, preflight, session)
@@ -187,7 +220,13 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
 
         post1_headers = {"Referer": r1.url, "Origin": _origin(r1.url)}
         step = "lti_form1_post"
-        r2 = session.post(post1_url, data=payload1, headers=post1_headers, timeout=timeout)
+        r2 = session.post(
+            post1_url,
+            data=payload1,
+            headers=post1_headers,
+            proxies=_proxies_for_url(post1_url, tool_proxies),
+            timeout=timeout,
+        )
         _log_http_step(step, r2, session)
 
         if _is_cloudflare_challenge(r2):
@@ -197,6 +236,7 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
                 preflight_retry = session.get(
                     post1_url,
                     headers={"Referer": r1.url},
+                    proxies=_proxies_for_url(post1_url, tool_proxies),
                     timeout=timeout,
                 )
                 _log_http_step(step, preflight_retry, session)
@@ -204,7 +244,13 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
                 logger.warning("Timetable preflight retry GET skipped: %s", type(exc).__name__)
 
             step = "lti_form1_post_retry"
-            r2 = session.post(post1_url, data=payload1, headers=post1_headers, timeout=timeout)
+            r2 = session.post(
+                post1_url,
+                data=payload1,
+                headers=post1_headers,
+                proxies=_proxies_for_url(post1_url, tool_proxies),
+                timeout=timeout,
+            )
             _log_http_step(step, r2, session)
 
         r2.raise_for_status()
@@ -222,6 +268,7 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
             post2_url,
             data=payload2,
             headers={"Referer": r2.url, "Origin": _origin(r2.url)},
+            proxies=_proxies_for_url(post2_url, tool_proxies),
             timeout=timeout,
         )
         _log_http_step(step, final_resp, session)
@@ -241,11 +288,13 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
 def get_timetable(canvas_token: str, date: str, timeout: int = DEFAULT_TIMEOUT) -> Dict[str, Any]:
     """Fetch timetable JSON for a single date (DD/MM/YYYY)."""
     ltik, session = launch_timetable(canvas_token, timeout=timeout)
+    tool_proxies = _tool_proxies()
     try:
         response = session.get(
             TIMETABLE_TOOL_URL,
             params={"date": date},
             headers={"Authorization": f"Bearer {ltik}"},
+            proxies=_proxies_for_url(TIMETABLE_TOOL_URL, tool_proxies),
             timeout=timeout,
         )
         _log_http_step("vsc_timetable_fetch", response, session)
