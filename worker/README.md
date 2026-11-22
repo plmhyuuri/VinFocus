@@ -2,6 +2,10 @@
 
 A tiny, host-restricted relay for VinFocus timetable sync.
 
+> If this Worker's egress is also blocked by the VSC tool's Cloudflare, see
+> [`../LOCAL_RELAY.md`](../LOCAL_RELAY.md) for the local relay + Cloudflare
+> Tunnel setup, which uses your home IP.
+
 Vercel is blocked by Cloudflare when it calls
 `lms-lti-timetables.vinschool.edu.vn` directly. This Worker forwards only that
 host's LTI requests and returns the response to the Python backend. Canvas

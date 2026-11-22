@@ -295,7 +295,11 @@ python tests/test_fixes.py
 Hosted timetable sync can be blocked by Cloudflare when Vercel calls the VSC
 tool directly. The optional Cloudflare Worker in `worker/` relays only
 `lms-lti-timetables.vinschool.edu.vn`; Canvas requests and the Canvas token
-stay direct.
+stay direct. If the Worker's egress is also blocked, see `LOCAL_RELAY.md` for
+the local relay + Cloudflare Tunnel setup, which uses your home IP.
+
+For the separate local relay process, see `LOCAL_RELAY.md`. It reads
+`RELAY_KEY` and `RELAY_PORT`, not the Flask app's environment.
 
 ## Deployment
 
