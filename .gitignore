@@ -40,4 +40,9 @@ dist/
 # Database
 feedback.db
 
+# Cloudflare Workers
+worker/node_modules/
+worker/.wrangler/
+worker/.dev.vars
+
 test.html

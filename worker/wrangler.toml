@@ -1,0 +1,12 @@
+name = "vsc-timetable-relay"
+main = "src/index.js"
+compatibility_date = "2026-11-22"
+workers_dev = true
+
+# The shared secret is set separately, not in this file:
+#   npx wrangler secret put RELAY_KEY
+#
+# Optional custom domain:
+# routes = [
+#   { pattern = "timetable-relay.example.com/*", zone_name = "example.com" }
+# ]

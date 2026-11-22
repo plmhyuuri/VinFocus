@@ -288,6 +288,14 @@ python tests/test_fixes.py
 | `ADMIN_API_KEY` | — | Secret key for accessing feedback data. On Render, this is auto-generated. |
 | `FLASK_DEBUG` | `"false"` | Enable Flask debug mode |
 | `PORT` | `5000` | Port for the development server |
+| `TIMETABLE_RELAY_URL` | — | Optional Cloudflare Worker relay URL for hosted VSC timetable sync. See `worker/README.md`. |
+| `TIMETABLE_RELAY_KEY` | — | Shared secret for the Cloudflare Worker relay. |
+| `TIMETABLE_PROXY_URL` | — | Optional HTTP proxy for VSC timetable tool requests (experiment; relay takes precedence). |
+
+Hosted timetable sync can be blocked by Cloudflare when Vercel calls the VSC
+tool directly. The optional Cloudflare Worker in `worker/` relays only
+`lms-lti-timetables.vinschool.edu.vn`; Canvas requests and the Canvas token
+stay direct.
 
 ## Deployment
 

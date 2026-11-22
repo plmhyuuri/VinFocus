@@ -1,3 +1,6 @@
+import base64
+import email.message
+import http.client
 import logging
 import os
 import re
@@ -7,6 +10,7 @@ from urllib.parse import parse_qs, urljoin, urlparse, urlunparse
 
 import requests
 from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +18,8 @@ BASE_URL = "https://lms.vinschool.edu.vn"
 TIMETABLE_TOOL_URL = "https://lms-lti-timetables.vinschool.edu.vn/gettimetable"
 TIMETABLE_TOOL_HOST = urlparse(TIMETABLE_TOOL_URL).hostname or ""
 TOOL_PROXY_ENV = "TIMETABLE_PROXY_URL"
+TOOL_RELAY_URL_ENV = "TIMETABLE_RELAY_URL"
+TOOL_RELAY_KEY_ENV = "TIMETABLE_RELAY_KEY"
 EXTERNAL_TOOL_ID = 236
 DEFAULT_TIMEOUT = 20
 
@@ -75,6 +81,189 @@ def _proxies_for_url(url: str, proxies: Optional[Dict[str, str]]) -> Optional[Di
     if not proxies:
         return None
     return proxies if urlparse(url or "").hostname == TIMETABLE_TOOL_HOST else None
+
+
+def _tool_relay() -> Optional[Tuple[str, str]]:
+    """Return (relay_url, relay_key) when the Worker relay is configured."""
+    relay_url = (os.getenv(TOOL_RELAY_URL_ENV) or "").strip()
+    if not relay_url:
+        return None
+    parsed = urlparse(relay_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        logger.warning("Ignoring invalid %s value", TOOL_RELAY_URL_ENV)
+        return None
+    relay_key = (os.getenv(TOOL_RELAY_KEY_ENV) or "").strip()
+    return relay_url, relay_key
+
+
+def _relay_label(relay: Optional[Tuple[str, str]]) -> str:
+    if not relay:
+        return "disabled"
+    parsed = urlparse(relay[0])
+    return parsed.hostname or "configured"
+
+
+class _RelayOriginalResponse:
+    """Minimal urllib3-style original response used for cookie extraction."""
+
+    def __init__(self, set_cookie_headers: List[str]):
+        self.msg = email.message.Message()
+        for header in set_cookie_headers:
+            self.msg.add_header("Set-Cookie", header)
+
+
+class _RelayRaw:
+    """Minimal urllib3-style raw response backed by bytes from the Worker."""
+
+    def __init__(
+        self,
+        status: int,
+        headers: Dict[str, str],
+        body: bytes,
+        set_cookie_headers: List[str],
+    ):
+        self.status = status
+        self.headers = headers
+        self.reason = http.client.responses.get(status, "")
+        self._body = body
+        self._offset = 0
+        self._original_response = _RelayOriginalResponse(set_cookie_headers)
+        self.closed = False
+
+    def read(self, amt: Optional[int] = None, decode_content: Optional[bool] = None) -> bytes:
+        if amt is None:
+            data = self._body[self._offset:]
+            self._offset = len(self._body)
+            return data
+        data = self._body[self._offset:self._offset + amt]
+        self._offset += len(data)
+        return data
+
+    def stream(self, amt: int = 2 ** 16, decode_content: Optional[bool] = None):
+        while True:
+            chunk = self.read(amt, decode_content=decode_content)
+            if not chunk:
+                break
+            yield chunk
+
+    def release_conn(self) -> None:
+        return None
+
+    def close(self) -> None:
+        self.closed = True
+
+    def isclosed(self) -> bool:
+        return self.closed
+
+
+class _RelayAdapter(HTTPAdapter):
+    """Send requests for the VSC tool host through the Cloudflare Worker relay."""
+
+    def __init__(self, relay_url: str, relay_key: str = ""):
+        super().__init__()
+        self.relay_url = relay_url
+        self.relay_key = relay_key
+
+    def send(self, request, stream=False, timeout=None, verify=True, cert=None, proxies=None):
+        payload: Dict[str, Any] = {
+            "url": request.url,
+            "method": request.method,
+            "headers": dict(request.headers),
+        }
+        body = request.body
+        if hasattr(body, "read"):
+            body = body.read()
+        if body is not None:
+            if isinstance(body, bytes):
+                payload["body"] = base64.b64encode(body).decode("ascii")
+                payload["bodyEncoding"] = "base64"
+            else:
+                payload["body"] = str(body)
+
+        relay_headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        if self.relay_key:
+            relay_headers["X-Relay-Key"] = self.relay_key
+
+        try:
+            relay_response = requests.post(
+                self.relay_url,
+                json=payload,
+                headers=relay_headers,
+                timeout=timeout or DEFAULT_TIMEOUT,
+                allow_redirects=False,
+                proxies={"http": None, "https": None},
+            )
+        except requests.RequestException as exc:
+            raise requests.ConnectionError(
+                f"Timetable relay request failed: {type(exc).__name__}"
+            ) from exc
+
+        if relay_response.status_code != 200:
+            detail = ""
+            try:
+                error_data = relay_response.json()
+                if isinstance(error_data, dict) and error_data.get("error"):
+                    detail = f": {error_data['error']}"
+            except ValueError:
+                pass
+            raise requests.HTTPError(
+                f"Timetable relay returned status {relay_response.status_code}{detail}",
+                response=relay_response,
+            )
+
+        try:
+            data = relay_response.json()
+        except ValueError as exc:
+            raise requests.ConnectionError("Timetable relay returned invalid JSON") from exc
+        if not isinstance(data, dict):
+            raise requests.ConnectionError("Timetable relay returned an unexpected response")
+
+        status = data.get("status")
+        if not isinstance(status, int):
+            raise requests.ConnectionError("Timetable relay returned no status")
+
+        body_value = data.get("body") or ""
+        if data.get("bodyEncoding") == "base64":
+            try:
+                body_bytes = base64.b64decode(body_value)
+            except (TypeError, ValueError) as exc:
+                raise requests.ConnectionError("Timetable relay returned invalid body") from exc
+        else:
+            body_bytes = str(body_value).encode("utf-8")
+
+        headers = data.get("headers") or {}
+        if not isinstance(headers, dict):
+            headers = {}
+        set_cookie = data.get("setCookie") or []
+        if isinstance(set_cookie, str):
+            set_cookie = [set_cookie]
+
+        raw = _RelayRaw(status, headers, body_bytes, [str(item) for item in set_cookie])
+        return self.build_response(request, raw)
+
+
+def _build_session(relay: Optional[Tuple[str, str]] = None) -> requests.Session:
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Upgrade-Insecure-Requests": "1",
+    })
+    if relay:
+        relay_url, relay_key = relay
+        session.mount(
+            f"https://{TIMETABLE_TOOL_HOST}",
+            _RelayAdapter(relay_url, relay_key),
+        )
+    return session
 
 
 def _http_error(
@@ -159,20 +348,17 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
     if not canvas_token:
         raise TimetableFetchError("Missing Canvas token")
 
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Upgrade-Insecure-Requests": "1",
-    })
+    relay = _tool_relay()
+    tool_proxies = None if relay else _tool_proxies()
+    if relay:
+        logger.info("Timetable tool relay: %s", _relay_label(relay))
+        if not relay[1]:
+            logger.warning("Timetable relay key is not configured")
+    else:
+        logger.info("Timetable tool proxy: %s", _proxy_label(tool_proxies))
+
+    session = _build_session(relay)
     headers = {"Authorization": f"Bearer {canvas_token}"}
-    tool_proxies = _tool_proxies()
-    logger.info("Timetable tool proxy: %s", _proxy_label(tool_proxies))
 
     step = "canvas_sessionless_launch"
     try:
@@ -321,7 +507,8 @@ def launch_timetable(canvas_token: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple
 def get_timetable(canvas_token: str, date: str, timeout: int = DEFAULT_TIMEOUT) -> Dict[str, Any]:
     """Fetch timetable JSON for a single date (DD/MM/YYYY)."""
     ltik, session = launch_timetable(canvas_token, timeout=timeout)
-    tool_proxies = _tool_proxies()
+    relay = _tool_relay()
+    tool_proxies = None if relay else _tool_proxies()
     try:
         response = session.get(
             TIMETABLE_TOOL_URL,
